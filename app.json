@@ -1,0 +1,86 @@
+{
+  "expo": {
+    "name": "Hit",
+    "slug": "hit",
+    "scheme": "hit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0F172A",
+      "resizeMode": "contain",
+      "image": "./assets/splash-icon.png"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.hit.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Hit uses your location to show tennis players and court posts near you.",
+        "NSPhotoLibraryUsageDescription": "Hit needs access to your photos so you can set your profile and cover pictures."
+      }
+    },
+    "android": {
+      "package": "app.hit.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Hit uses your location to show tennis players and court posts near you."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Hit needs access to your photos so you can set your profile and cover pictures."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2563EB",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "Hit"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "771c79e7-b68a-4060-ba03-13de32c33226"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/771c79e7-b68a-4060-ba03-13de32c33226"
+    }
+  }
+}
