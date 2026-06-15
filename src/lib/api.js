@@ -50,6 +50,11 @@ async function currentUid() {
   return data?.session?.user?.id ?? null;
 }
 
+// Public accessor for the signed-in user's id (null in demo mode).
+export async function getCurrentUserId() {
+  return currentUid();
+}
+
 // Read with mock fallback. `fallbackOnEmpty` is true for discovery content.
 async function readList({ live, mockData, fallbackOnEmpty = false }) {
   if (!shouldTryLive()) return mockData();
@@ -253,8 +258,13 @@ export async function browsePlayers({ sport, lat, lng, radius = 25, min = null, 
       return mockData();
     }
     markReachable();
-    if (!data || data.length === 0) return mockData(); // discovery fallback
-    return data.map((row) => browseRowToPlayer(row, sport));
+    // NOTE: when live + reachable we return the real (PostGIS-filtered) result
+    // as-is — even when empty. We deliberately do NOT fall back to mock players
+    // here, because mock players carry static distances and would let someone
+    // far away (e.g. Boston) appear for a user elsewhere (e.g. San Jose),
+    // breaking real distance filtering. An empty real result shows the friendly
+    // "no players near you" empty state instead.
+    return (data || []).map((row) => browseRowToPlayer(row, sport));
   } catch (e) {
     markUnreachable();
     return mockData();
@@ -531,6 +541,27 @@ export async function createCourtPost(draft) {
       .select('id')
       .single();
   });
+}
+
+// Edit an existing court post (author-only, enforced by RLS).
+export async function updateCourtPost(id, draft) {
+  return write(() =>
+    supabase
+      .from('court_posts')
+      .update({
+        court: draft.court,
+        city: draft.city,
+        when_text: draft.when,
+        level: draft.level,
+        body: draft.text,
+      })
+      .eq('id', id)
+  );
+}
+
+// Delete a court post (author-only, enforced by RLS).
+export async function deleteCourtPost(id) {
+  return write(() => supabase.from('court_posts').delete().eq('id', id));
 }
 
 // ===========================================================================
@@ -889,6 +920,9 @@ export default {
   subscribeMessages,
   getCourtPosts,
   createCourtPost,
+  updateCourtPost,
+  deleteCourtPost,
+  getCurrentUserId,
   getCommunities,
   getCommunity,
   joinCommunity,

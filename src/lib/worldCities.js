@@ -3,7 +3,7 @@
 // includes many smaller towns/suburbs so demo mode finds "unpopular" places.
 // Format: "City, Region/Country".
 
-export const WORLD_CITIES = [
+const RAW_WORLD_CITIES = [
   // --- United States (major + many smaller towns/suburbs) ---
   'New York, NY', 'Los Angeles, CA', 'Chicago, IL', 'Houston, TX', 'Phoenix, AZ',
   'Philadelphia, PA', 'San Antonio, TX', 'San Diego, CA', 'Dallas, TX', 'San Jose, CA',
@@ -254,7 +254,14 @@ export const WORLD_CITIES = [
   'Bariloche, Argentina', 'Punta del Este, Uruguay', 'Viña del Mar, Chile', 'Cuenca, Ecuador', 'Mérida, Venezuela',
 ];
 
+// Deduplicate (the raw list above has some repeats across regions) and sort
+// alphabetically so every city appears exactly once and suggestions are tidy.
+export const WORLD_CITIES = Array.from(new Set(RAW_WORLD_CITIES)).sort((a, b) =>
+  a.localeCompare(b)
+);
+
 // Case-insensitive prefix-then-substring match, prefix matches ranked first.
+// WORLD_CITIES is already deduped + sorted, so results are unique.
 export function searchWorldCities(query, limit = 8) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -264,7 +271,6 @@ export function searchWorldCities(query, limit = 8) {
     const lc = c.toLowerCase();
     if (lc.startsWith(q)) starts.push(c);
     else if (lc.includes(q)) contains.push(c);
-    if (starts.length >= limit) break;
   }
   return [...starts, ...contains].slice(0, limit);
 }

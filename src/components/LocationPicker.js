@@ -6,7 +6,17 @@
 //    detect the device location, or search any city/town inline.
 
 import React, { useState } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  Modal,
+  ScrollView,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,7 +62,10 @@ export function LocationPickerModal({ visible, onClose }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
           <View style={styles.handle} />
@@ -63,8 +76,13 @@ export function LocationPickerModal({ visible, onClose }) {
             </Pressable>
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {/* Search any city */}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Search any city — dropdown renders inline and stays above the
+                keyboard thanks to the KeyboardAvoidingView wrapper. */}
             <CityField
               label="Search a city or town"
               value={query}
@@ -116,7 +134,7 @@ export function LocationPickerModal({ visible, onClose }) {
             ) : null}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

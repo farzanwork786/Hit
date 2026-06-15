@@ -32,6 +32,19 @@ export default function ChatDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(Boolean(initialChatId));
   const [text, setText] = useState('');
   const listRef = useRef(null);
+  const myUidRef = useRef(null);
+
+  // Resolve the signed-in user's id once so realtime inserts can be attributed
+  // to the correct side (mine = right, theirs = left).
+  useEffect(() => {
+    let active = true;
+    api.getCurrentUserId().then((uid) => {
+      if (active) myUidRef.current = uid;
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportStep, setReportStep] = useState(0); // 0=main, 1=reasons, 2=done
@@ -91,8 +104,24 @@ export default function ChatDetailScreen({ route, navigation }) {
 
     const unsub = api.subscribeMessages(chatId, (m) => {
       setMessages((prev) => {
-        if (prev.some((x) => x.id === m.id)) return prev; // de-dupe own optimistic echo
-        return [...prev, { id: m.id, text: m.body, fromMe: false, time: formatTime(m.created_at) }];
+        // Already have this exact server row → ignore.
+        if (prev.some((x) => x.id === m.id)) return prev;
+
+        const mine = myUidRef.current != null && m.sender_id === myUidRef.current;
+
+        // Our own message echoes back over realtime. Reconcile it with the
+        // optimistic bubble (replace the pending local-id row in place) instead
+        // of appending a duplicate on the wrong side.
+        if (mine) {
+          const idx = prev.findIndex((x) => x.pending && x.text === m.body);
+          if (idx !== -1) {
+            const copy = prev.slice();
+            copy[idx] = { id: m.id, text: m.body, fromMe: true, time: formatTime(m.created_at) };
+            return copy;
+          }
+        }
+
+        return [...prev, { id: m.id, text: m.body, fromMe: mine, time: formatTime(m.created_at) }];
       });
       api.markConversationRead(chatId);
     });
@@ -109,6 +138,7 @@ export default function ChatDetailScreen({ route, navigation }) {
       id: `local-${Date.now()}`,
       text: body,
       fromMe: true,
+      pending: true, // marks it for reconciliation with the realtime echo
       time: formatTime(new Date().toISOString()),
     };
     setMessages((prev) => [...prev, optimistic]);

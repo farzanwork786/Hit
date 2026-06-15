@@ -11,6 +11,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,7 @@ import { notifyCourtBoardReply } from '../lib/notifications';
 import { SPORTS } from '../lib/ratings';
 import { useSport } from '../context/SportContext';
 import { useLocation } from '../context/LocationContext';
+import { useAuth } from '../context/AuthContext';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
 const DISTANCES = [5, 10, 25, 50];
@@ -34,42 +36,132 @@ const DISTANCES = [5, 10, 25, 50];
 export default function CourtBoardScreen({ navigation }) {
   const { sport } = useSport();
   const { activeLocation, activeCoords } = useLocation();
+  const { profile, session, isSupabaseConfigured } = useAuth();
+  // Identifies "my" posts so only they get edit/delete. Falls back to the mock
+  // user id in demo mode.
+  const myId = session?.user?.id || currentUser.id;
+
   const [maxDistance, setMaxDistance] = useState(25);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null); // post being edited (or null)
+  const [menuPost, setMenuPost] = useState(null); // post whose ⋯ menu is open
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const result = await api.getCourtPosts({ sport, maxDistance });
-    setPosts(result);
-    setLoading(false);
-  }, [sport, maxDistance]);
+  const load = useCallback(
+    async ({ silent } = {}) => {
+      if (!silent) setLoading(true);
+      const result = await api.getCourtPosts({ sport, maxDistance });
+      setPosts((prev) => {
+        // Live mode: the server is the source of truth (a successful create
+        // reload returns the real row), so replace wholesale.
+        if (isSupabaseConfigured) return result;
+        // Demo mode: there's no backend to persist to, so keep this session's
+        // optimistic posts and merge in the mock feed.
+        const locals = prev.filter((p) => String(p.id).startsWith('local-'));
+        return [...locals, ...result.filter((r) => !locals.some((l) => l.id === r.id))];
+      });
+      setLoading(false);
+      setRefreshing(false);
+    },
+    [sport, maxDistance, isSupabaseConfigured]
+  );
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Reload on focus so new posts / edits / deletes made elsewhere show up.
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => load({ silent: true }));
+    return unsub;
+  }, [navigation, load]);
+
+  function onRefresh() {
+    setRefreshing(true);
+    load({ silent: true });
+  }
 
   const data = posts;
 
+  // Author shape for optimistic posts — uses my real id so the post is
+  // immediately recognised as mine (edit/delete available right away).
+  const myAuthor = {
+    ...currentUser,
+    id: myId,
+    name: profile?.name || currentUser.name,
+    avatar: profile?.avatar || currentUser.avatar,
+  };
+
   async function addPost(draft) {
+    setComposerOpen(false);
+
+    // Editing an existing post → optimistic in-place update, then persist.
+    if (editingPost) {
+      const target = editingPost;
+      setEditingPost(null);
+      setPosts((prev) =>
+        prev.map((p) => (p.id === target.id ? { ...p, ...draft, city: draft.city || p.city } : p))
+      );
+      const res = await api.updateCourtPost(target.id, { ...draft });
+      if (res && res.ok === false) {
+        Alert.alert('Could not save changes', 'Please try again.');
+      }
+      load({ silent: true });
+      return;
+    }
+
+    // Creating a new post → optimistic prepend, then persist + reconcile.
+    const tempId = `local-${Date.now()}`;
     const optimistic = {
-      id: `local-${Date.now()}`,
+      id: tempId,
       sport,
-      author: currentUser,
+      author: myAuthor,
       timeAgo: 'now',
-      city: draft.city || activeLocation || currentUser.city,
+      city: draft.city || activeLocation || profile?.city || currentUser.city,
       distance: 0,
       likes: 0,
       comments: 0,
       ...draft,
     };
     setPosts((prev) => [optimistic, ...prev]);
-    setComposerOpen(false);
-    await api.createCourtPost({
+    const res = await api.createCourtPost({
       ...draft,
       sport,
       lat: activeCoords?.lat ?? null,
       lng: activeCoords?.lng ?? null,
     });
+    // When live, pull the canonical row (real id, server ordering) so the post
+    // persists correctly across refreshes.
+    if (res && res.ok && !res.demo) {
+      load({ silent: true });
+    }
+  }
+
+  function openEdit(post) {
+    setMenuPost(null);
+    setEditingPost(post);
+    setComposerOpen(true);
+  }
+
+  function confirmDelete(post) {
+    setMenuPost(null);
+    Alert.alert('Delete post?', 'This removes your post from the Court Board.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setPosts((prev) => prev.filter((p) => p.id !== post.id));
+          const res = await api.deleteCourtPost(post.id);
+          if (res && res.ok === false) {
+            Alert.alert('Could not delete', 'Please try again.');
+            load({ silent: true });
+          }
+        },
+      },
+    ]);
   }
 
   return (
@@ -79,7 +171,15 @@ export default function CourtBoardScreen({ navigation }) {
           <Text style={styles.kicker}>Court Board</Text>
           <Text style={styles.title}>Who's playing?</Text>
         </View>
-        <IconButton name="add" bg={colors.blue} color={colors.white} onPress={() => setComposerOpen(true)} />
+        <IconButton
+          name="add"
+          bg={colors.blue}
+          color={colors.white}
+          onPress={() => {
+            setEditingPost(null);
+            setComposerOpen(true);
+          }}
+        />
       </View>
 
       <View style={styles.toggleRow}>
@@ -104,24 +204,29 @@ export default function CourtBoardScreen({ navigation }) {
       <FlatList
         data={loading ? [] : data}
         keyExtractor={(p) => p.id}
-        onRefresh={load}
-        refreshing={false}
-        renderItem={({ item }) => (
-          <CourtPost
-            post={item}
-            onPress={() => item.author && navigation.navigate('PlayerProfile', { player: item.author })}
-            onReply={async () => {
-              if (!item.author || item.author.id === currentUser.id) return;
-              notifyCourtBoardReply(currentUser);
-              const conv = await api.getOrCreateConversation(item.author.id);
-              navigation.navigate('ChatDetail', {
-                player: item.author,
-                chatId: conv?.id || undefined,
-                isRequest: !conv?.id,
-              });
-            }}
-          />
-        )}
+        onRefresh={onRefresh}
+        refreshing={refreshing}
+        renderItem={({ item }) => {
+          const isMine = item.author?.id === myId;
+          return (
+            <CourtPost
+              post={item}
+              isMine={isMine}
+              onMenu={() => setMenuPost(item)}
+              onPress={() => item.author && navigation.navigate('PlayerProfile', { player: item.author })}
+              onReply={async () => {
+                if (!item.author || isMine) return;
+                notifyCourtBoardReply(currentUser);
+                const conv = await api.getOrCreateConversation(item.author.id);
+                navigation.navigate('ChatDetail', {
+                  player: item.author,
+                  chatId: conv?.id || undefined,
+                  isRequest: !conv?.id,
+                });
+              }}
+            />
+          );
+        }}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -142,27 +247,72 @@ export default function CourtBoardScreen({ navigation }) {
       />
 
       <ComposerSheet
-        key={`${sport}-${activeLocation}`} // remount on sport/location switch
+        // Remount on sport/location switch, and whenever the edit target changes
+        // so the form re-seeds with the right values.
+        key={`${sport}-${activeLocation}-${editingPost?.id || 'new'}`}
         visible={composerOpen}
         sport={sport}
         defaultLocation={activeLocation || currentUser.city}
-        onClose={() => setComposerOpen(false)}
+        editingPost={editingPost}
+        onClose={() => {
+          setComposerOpen(false);
+          setEditingPost(null);
+        }}
         onSubmit={addPost}
+      />
+
+      {/* ⋯ menu for the current user's own posts */}
+      <PostMenu
+        post={menuPost}
+        onClose={() => setMenuPost(null)}
+        onEdit={openEdit}
+        onDelete={confirmDelete}
       />
     </SafeAreaView>
   );
 }
 
-// --- Create post bottom sheet --------------------------------------------
-function ComposerSheet({ visible, sport, defaultLocation, onClose, onSubmit }) {
+// --- Own-post options sheet (edit / delete) -----------------------------
+function PostMenu({ post, onClose, onEdit, onDelete }) {
+  return (
+    <Modal visible={Boolean(post)} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.menuOverlay}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <View style={styles.menuCard}>
+          <View style={styles.menuHandle} />
+          <Pressable style={styles.menuRow} onPress={() => post && onEdit(post)}>
+            <Ionicons name="create-outline" size={20} color={colors.navy} />
+            <Text style={styles.menuLabel}>Edit post</Text>
+          </Pressable>
+          <View style={styles.menuSep} />
+          <Pressable style={styles.menuRow} onPress={() => post && onDelete(post)}>
+            <Ionicons name="trash-outline" size={20} color={colors.red} />
+            <Text style={[styles.menuLabel, { color: colors.red }]}>Delete post</Text>
+          </Pressable>
+          <View style={styles.menuSep} />
+          <Pressable style={styles.menuRow} onPress={onClose}>
+            <Ionicons name="close-outline" size={20} color={colors.slate500} />
+            <Text style={[styles.menuLabel, { color: colors.slate500 }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// --- Create / edit post bottom sheet -------------------------------------
+function ComposerSheet({ visible, sport, defaultLocation, editingPost, onClose, onSubmit }) {
   const insets = useSafeAreaInsets();
+  const isEditing = Boolean(editingPost);
   const levels = POST_LEVELS[sport];
-  const [text, setText] = useState('');
-  const [court, setCourt] = useState('');
-  const [location, setLocation] = useState(defaultLocation);
+  const [text, setText] = useState(editingPost?.text || '');
+  const [court, setCourt] = useState(editingPost?.court || '');
+  const [location, setLocation] = useState(editingPost?.city || defaultLocation);
   const [editingLoc, setEditingLoc] = useState(false);
-  const [when, setWhen] = useState('');
-  const [level, setLevel] = useState(levels[0]);
+  const [when, setWhen] = useState(editingPost && editingPost.when !== 'Flexible' ? editingPost.when : '');
+  const [level, setLevel] = useState(
+    editingPost && levels.includes(editingPost.level) ? editingPost.level : levels[0]
+  );
 
   function post() {
     if (!text.trim() || !court.trim()) return;
@@ -191,7 +341,7 @@ function ComposerSheet({ visible, sport, defaultLocation, onClose, onSubmit }) {
             <View style={styles.sheetHeader}>
               <View style={styles.sheetTitleRow}>
                 <SportIcon sport={sport} size={20} color={colors.navy} />
-                <Text style={styles.sheetTitle}>Post to the board</Text>
+                <Text style={styles.sheetTitle}>{isEditing ? 'Edit your post' : 'Post to the board'}</Text>
               </View>
               <Pressable onPress={onClose} hitSlop={10}>
                 <Ionicons name="close" size={24} color={colors.slate500} />
@@ -262,7 +412,12 @@ function ComposerSheet({ visible, sport, defaultLocation, onClose, onSubmit }) {
               </View>
             </ScrollView>
 
-            <AppButton title="Post" icon="megaphone-outline" onPress={post} disabled={!canPost} />
+            <AppButton
+              title={isEditing ? 'Save changes' : 'Post'}
+              icon={isEditing ? 'checkmark' : 'megaphone-outline'}
+              onPress={post}
+              disabled={!canPost}
+            />
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -271,22 +426,32 @@ function ComposerSheet({ visible, sport, defaultLocation, onClose, onSubmit }) {
   );
 }
 
-function CourtPost({ post, onPress, onReply }) {
+function CourtPost({ post, isMine, onMenu, onPress, onReply }) {
   return (
     <View style={styles.card}>
-      <Pressable style={styles.cardHead} onPress={onPress}>
-        <Image source={{ uri: post.author.avatar }} style={styles.avatar} contentFit="cover" />
-        <View style={{ flex: 1 }}>
-          <View style={styles.nameRow}>
-            <Text style={styles.author}>{post.author.name}</Text>
-            {post.author.verified ? (
-              <Ionicons name="checkmark-circle" size={14} color={colors.blue} style={{ marginLeft: 4 }} />
-            ) : null}
+      <View style={styles.cardHead}>
+        <Pressable style={styles.cardHeadMain} onPress={onPress}>
+          <Image source={{ uri: post.author.avatar }} style={styles.avatar} contentFit="cover" />
+          <View style={{ flex: 1 }}>
+            <View style={styles.nameRow}>
+              <Text style={styles.author}>{post.author.name}</Text>
+              {isMine ? <Text style={styles.youTag}>You</Text> : null}
+              {post.author.verified ? (
+                <Ionicons name="checkmark-circle" size={14} color={colors.blue} style={{ marginLeft: 4 }} />
+              ) : null}
+            </View>
+            <Text style={styles.meta}>
+              {post.timeAgo} ago{post.distance ? ` · ${post.distance} mi away` : ''}
+            </Text>
           </View>
-          <Text style={styles.meta}>{post.timeAgo} ago · {post.distance} mi away</Text>
-        </View>
+        </Pressable>
         <Tag label={post.level} tone="navy" />
-      </Pressable>
+        {isMine ? (
+          <Pressable onPress={onMenu} hitSlop={8} style={styles.postMenuBtn}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={colors.slate500} />
+          </Pressable>
+        ) : null}
+      </View>
 
       <Text style={styles.text}>{post.text}</Text>
 
@@ -371,10 +536,22 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadow.soft,
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardHeadMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  postMenuBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.slate200 },
-  nameRow: { flexDirection: 'row', alignItems: 'center' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   author: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.navy },
+  youTag: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 10,
+    color: colors.blue,
+    backgroundColor: colors.blueTint,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
   meta: { fontFamily: fonts.body, fontSize: 12, color: colors.slate400, marginTop: 1 },
   text: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: colors.slate700, marginTop: spacing.md },
   detailRow: { gap: 6, marginTop: spacing.md },
@@ -455,4 +632,26 @@ const styles = StyleSheet.create({
   },
   levelChipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
   levelChipText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.slate600 },
+
+  // ⋯ own-post menu
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' },
+  menuCard: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? 34 : spacing.xl,
+  },
+  menuHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.slate300,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
+  },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 14 },
+  menuLabel: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.navy },
+  menuSep: { height: 1, backgroundColor: colors.slate100 },
 });
