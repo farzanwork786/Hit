@@ -52,7 +52,12 @@ export default function CourtBoardScreen({ navigation }) {
   const load = useCallback(
     async ({ silent } = {}) => {
       if (!silent) setLoading(true);
-      const result = await api.getCourtPosts({ sport, maxDistance });
+      const result = await api.getCourtPosts({
+        sport,
+        lat: activeCoords?.lat ?? null,
+        lng: activeCoords?.lng ?? null,
+        maxDistance,
+      });
       setPosts((prev) => {
         // Live mode: the server is the source of truth (a successful create
         // reload returns the real row), so replace wholesale.
@@ -65,7 +70,7 @@ export default function CourtBoardScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     },
-    [sport, maxDistance, isSupabaseConfigured]
+    [sport, maxDistance, activeCoords, isSupabaseConfigured]
   );
 
   useEffect(() => {
@@ -217,11 +222,12 @@ export default function CourtBoardScreen({ navigation }) {
               onReply={async () => {
                 if (!item.author || isMine) return;
                 notifyCourtBoardReply(currentUser);
-                const conv = await api.getOrCreateConversation(item.author.id);
+                const conv = await api.getOrCreateConversation(item.author.id, item.sport || sport);
                 navigation.navigate('ChatDetail', {
                   player: item.author,
                   chatId: conv?.id || undefined,
                   isRequest: !conv?.id,
+                  sport: item.sport || sport,
                 });
               }}
             />

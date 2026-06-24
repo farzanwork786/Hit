@@ -5,7 +5,7 @@
 // registered account), falling back to the demo seed user. A single-sport user
 // defaults to their sport and the toggle renders as a subtle static chip.
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { currentUser } from '../lib/mockData';
 import { SPORT_KEYS } from '../lib/ratings';
@@ -27,13 +27,10 @@ export function SportProvider({ children }) {
     return list.length ? list : ['tennis'];
   }, [profile]);
 
+  // Default to the user's primary sport, but anyone can switch freely between
+  // tennis and pickleball via the toggle — we don't force the active sport back
+  // to their profile sports.
   const [sport, setSport] = useState(mySports[0]);
-
-  // Keep the active sport valid as the user's sports change (e.g. after
-  // registration or editing their profile).
-  useEffect(() => {
-    if (!mySports.includes(sport)) setSport(mySports[0]);
-  }, [mySports]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo(
     () => ({

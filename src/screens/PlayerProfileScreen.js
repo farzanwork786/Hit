@@ -29,6 +29,7 @@ import {
 } from '../lib/mockData';
 import * as api from '../lib/api';
 import { notifyMatchRequest } from '../lib/notifications';
+import { useSport } from '../context/SportContext';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -45,6 +46,7 @@ const REPORT_REASONS = [
 
 export default function PlayerProfileScreen({ route, navigation }) {
   const { player } = route.params;
+  const { sport } = useSport();
   const sports = SPORT_KEYS.filter((s) => playsSport(player, s));
   const friendsVisible = canSeeFriends(player);
   const friends = friendsVisible ? getFriends(player) : [];
@@ -106,8 +108,8 @@ export default function PlayerProfileScreen({ route, navigation }) {
 
   async function sendRequest() {
     notifyMatchRequest({ id: player.id, name: 'You' });
-    await api.sendMatchRequest(player.id, `Hey ${player.name.split(' ')[0]}! Want to hit sometime?`);
-    const conv = await api.getOrCreateConversation(player.id);
+    await api.sendMatchRequest(player.id, `Hey ${player.name.split(' ')[0]}! Want to hit sometime?`, sport);
+    const conv = await api.getOrCreateConversation(player.id, sport);
     navigation.navigate('ChatDetail', {
       player,
       chatId: conv?.id || undefined,

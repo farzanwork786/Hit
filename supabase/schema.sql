@@ -143,6 +143,7 @@ create table if not exists public.match_requests (
   from_user   uuid not null references public.profiles (id) on delete cascade,
   to_user     uuid not null references public.profiles (id) on delete cascade,
   message     text,
+  sport       text check (sport in ('tennis','pickleball')),
   status      text default 'pending' check (status in ('pending','accepted','declined')),
   created_at  timestamptz default now(),
   updated_at  timestamptz default now(),
@@ -171,6 +172,7 @@ create index if not exists idx_friendships_b on public.friendships (user_b);
 -- ============================================================
 create table if not exists public.conversations (
   id          uuid primary key default uuid_generate_v4(),
+  sport       text check (sport in ('tennis','pickleball')),
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
@@ -483,8 +485,14 @@ language sql stable security definer set search_path = public, extensions as $$
                     where (b.blocker_id = me.uid and b.blocked_id = p.id)
                        or (b.blocker_id = p.id and b.blocked_id = me.uid))
     and (
-      in_lat is null or in_lng is null or p.location is null
-      or st_dwithin(p.location, st_setsrid(st_makepoint(in_lng, in_lat),4326)::geography, radius_mi * 1609.34)
+      -- Searcher has no coordinates yet → can't filter by distance, show everyone.
+      in_lat is null or in_lng is null
+      -- Otherwise enforce a STRICT radius (Hinge/Tinder style): the candidate
+      -- must have a known location AND be within the radius. Players without a
+      -- location are deliberately NOT returned here — that prevents a far-away
+      -- account (e.g. Boston) showing up for a searcher in California.
+      or (p.location is not null
+          and st_dwithin(p.location, st_setsrid(st_makepoint(in_lng, in_lat),4326)::geography, radius_mi * 1609.34))
     )
     and (
       (ps.rating is null and include_nr)
@@ -508,23 +516,29 @@ language sql stable security definer set search_path = public as $$
   );
 $$;
 
--- RPC: start or fetch the 1:1 conversation between the caller and `other`.
-create or replace function public.get_or_create_conversation(other uuid)
+-- RPC: start or fetch the 1:1 conversation between the caller and `other`,
+-- scoped to a sport. Threads are per (pair, sport): a tennis chat and a
+-- pickleball chat with the same person are separate. An older untagged thread
+-- is reused and gets tagged on first sport-scoped use.
+create or replace function public.get_or_create_conversation(other uuid, in_sport text default null)
 returns uuid
 language plpgsql security definer set search_path = public as $$
 declare conv uuid; me uuid := auth.uid();
 begin
-  select cp1.conversation_id into conv
-  from public.conversation_participants cp1
-  join public.conversation_participants cp2
-    on cp1.conversation_id = cp2.conversation_id
-  where cp1.user_id = me and cp2.user_id = other
+  select c.id into conv
+  from public.conversations c
+  join public.conversation_participants cp1 on cp1.conversation_id = c.id and cp1.user_id = me
+  join public.conversation_participants cp2 on cp2.conversation_id = c.id and cp2.user_id = other
+  where in_sport is null or c.sport is null or c.sport = in_sport
+  order by (c.sport is not distinct from in_sport) desc  -- prefer an exact sport match
   limit 1;
 
   if conv is null then
-    insert into public.conversations default values returning id into conv;
+    insert into public.conversations (sport) values (in_sport) returning id into conv;
     insert into public.conversation_participants (conversation_id, user_id)
       values (conv, me), (conv, other);
+  elsif in_sport is not null then
+    update public.conversations set sport = in_sport where id = conv and sport is null;
   end if;
   return conv;
 end; $$;

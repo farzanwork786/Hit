@@ -9,6 +9,7 @@
 // Shapes returned here match what the screens already expect (e.g. a player has
 // `sports: { tennis: { utr, style }, pickleball: { dupr, style } }`).
 
+import * as Location from 'expo-location';
 import {
   supabase,
   isSupabaseConfigured,
@@ -19,6 +20,35 @@ import {
 } from './supabase';
 import { SPORTS, SPORT_KEYS } from './ratings';
 import * as mock from './mockData';
+
+// Forward-geocode a "City, Region" label into { lat, lng }. No permission
+// needed. Returns null if the geocoder is unavailable or finds no match.
+async function geocodeLabel(label) {
+  if (!label) return null;
+  try {
+    const [g] = await Location.geocodeAsync(label);
+    if (g && g.latitude != null && g.longitude != null) {
+      return { lat: g.latitude, lng: g.longitude };
+    }
+  } catch (e) {
+    // geocoder unavailable / no match
+  }
+  return null;
+}
+
+// Haversine distance in miles between two { lat, lng } points.
+function milesBetween(a, b) {
+  if (!a || !b || a.lat == null || a.lng == null || b.lat == null || b.lng == null) return null;
+  const R = 3958.8; // Earth radius in miles
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -211,6 +241,19 @@ export async function saveProfile(userId, patch) {
     if (patch[appKey] !== undefined) profilePatch[col] = patch[appKey];
   }
 
+  // When a city is being saved without explicit coordinates (registration, or
+  // changing your city in Edit Profile), geocode it so the profile gets lat/lng.
+  // The DB trigger then derives the PostGIS `location` point, which is what makes
+  // the account discoverable within the correct radius. (Precise GPS writes pass
+  // lat/lng directly and skip this.)
+  if (profilePatch.city && profilePatch.lat == null && profilePatch.lng == null) {
+    const coords = await geocodeLabel(profilePatch.city);
+    if (coords) {
+      profilePatch.lat = coords.lat;
+      profilePatch.lng = coords.lng;
+    }
+  }
+
   return write(async () => {
     if (Object.keys(profilePatch).length) {
       const { error } = await supabase
@@ -274,12 +317,15 @@ export async function browsePlayers({ sport, lat, lng, radius = 25, min = null, 
 // ===========================================================================
 // MATCH REQUESTS  +  FRIENDS
 // ===========================================================================
-export async function sendMatchRequest(toUserId, message) {
+export async function sendMatchRequest(toUserId, message, sport = null) {
   return write(async () => {
     const uid = await currentUid();
     return supabase
       .from('match_requests')
-      .upsert({ from_user: uid, to_user: toUserId, message, status: 'pending' }, { onConflict: 'from_user,to_user' });
+      .upsert(
+        { from_user: uid, to_user: toUserId, message, sport, status: 'pending' },
+        { onConflict: 'from_user,to_user' }
+      );
   });
 }
 
@@ -287,12 +333,12 @@ export async function getIncomingRequests() {
   return readList({
     fallbackOnEmpty: false,
     mockData: () =>
-      mock.requests.map((r) => ({ id: r.id, player: r.player, message: r.message, time: r.time })),
+      mock.requests.map((r) => ({ id: r.id, player: r.player, message: r.message, time: r.time, sport: r.sport ?? null })),
     live: async () => {
       const uid = await currentUid();
       const { data, error } = await supabase
         .from('match_requests')
-        .select('id,message,created_at,from_user,profiles!match_requests_from_user_fkey(' + PROFILE_COLS + ')')
+        .select('id,message,sport,created_at,from_user,profiles!match_requests_from_user_fkey(' + PROFILE_COLS + ')')
         .eq('to_user', uid)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -302,6 +348,7 @@ export async function getIncomingRequests() {
           id: r.id,
           player: dbProfileToApp(r.profiles, []),
           message: r.message,
+          sport: r.sport ?? null,
           time: timeAgo(r.created_at),
         })),
       };
@@ -351,16 +398,20 @@ export async function getConversations() {
         lastMessage: c.lastMessage,
         time: c.time,
         unread: c.unread,
+        sport: c.sport ?? null,
       })),
     live: async () => {
       const uid = await currentUid();
       const { data: parts, error } = await supabase
         .from('conversation_participants')
-        .select('conversation_id,last_read_at')
+        .select('conversation_id,last_read_at,conversations(sport)')
         .eq('user_id', uid);
       if (error) return { data: null, error };
       const convIds = (parts || []).map((p) => p.conversation_id);
       if (!convIds.length) return { data: [] };
+      const sportByConv = Object.fromEntries(
+        (parts || []).map((p) => [p.conversation_id, p.conversations?.sport ?? null])
+      );
 
       // Other participant per conversation.
       const { data: others } = await supabase
@@ -398,6 +449,7 @@ export async function getConversations() {
             lastMessage: last?.body || 'Say hi 👋',
             time: last ? timeAgo(last.created_at) : '',
             unread,
+            sport: sportByConv[cid] ?? null,
             _sortAt: last?.created_at || '',
           };
         })
@@ -408,10 +460,13 @@ export async function getConversations() {
   });
 }
 
-export async function getOrCreateConversation(otherId) {
+export async function getOrCreateConversation(otherId, sport = null) {
   if (!shouldTryLive()) return { ok: true, demo: true, id: null };
   try {
-    const { data, error } = await supabase.rpc('get_or_create_conversation', { other: otherId });
+    const { data, error } = await supabase.rpc('get_or_create_conversation', {
+      other: otherId,
+      in_sport: sport,
+    });
     if (error) {
       if (isNetworkError(error)) markUnreachable();
       return { ok: false, error };
@@ -487,39 +542,57 @@ export function subscribeMessages(conversationId, onInsert) {
 // ===========================================================================
 // COURT BOARD
 // ===========================================================================
-export async function getCourtPosts({ sport, maxDistance = 50 }) {
-  return readList({
-    fallbackOnEmpty: true,
-    mockData: () =>
-      mock.courtPosts
-        .filter((p) => p.sport === sport && p.distance <= maxDistance)
-        .map((p) => ({ ...p })),
-    live: async () => {
-      const { data, error } = await supabase
-        .from('court_posts')
-        .select('*,author:profiles(' + PROFILE_COLS + ')')
-        .eq('sport', sport)
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (error) return { data, error };
+export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance = 50 }) {
+  const origin = lat != null && lng != null ? { lat, lng } : null;
+
+  const mockData = () =>
+    mock.courtPosts
+      .filter((p) => p.sport === sport && p.distance <= maxDistance)
+      .map((p) => ({ ...p }));
+
+  if (!shouldTryLive()) return mockData();
+  try {
+    const { data, error } = await supabase
+      .from('court_posts')
+      .select('*,author:profiles(' + PROFILE_COLS + ')')
+      .eq('sport', sport)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) {
+      if (isNetworkError(error)) markUnreachable();
+      return mockData();
+    }
+    markReachable();
+
+    const posts = (data || []).map((p) => {
+      // Distance from the active (Browse) location to the post's location.
+      const dist = origin ? milesBetween(origin, { lat: p.lat, lng: p.lng }) : null;
       return {
-        data: (data || []).map((p) => ({
-          id: p.id,
-          sport: p.sport,
-          author: dbProfileToApp(p.author, []),
-          court: p.court,
-          city: p.city,
-          distance: 0,
-          when: p.when_text,
-          level: p.level,
-          text: p.body,
-          likes: p.likes || 0,
-          comments: p.comments || 0,
-          timeAgo: timeAgo(p.created_at),
-        })),
+        id: p.id,
+        sport: p.sport,
+        author: dbProfileToApp(p.author, []),
+        court: p.court,
+        city: p.city,
+        distance: dist != null ? Math.round(dist * 10) / 10 : null,
+        when: p.when_text,
+        level: p.level,
+        text: p.body,
+        likes: p.likes || 0,
+        comments: p.comments || 0,
+        timeAgo: timeAgo(p.created_at),
       };
-    },
-  });
+    });
+
+    // Strict radius when we have an origin: only posts with a known location
+    // within `maxDistance`. Without an origin we can't filter, so show all.
+    // (Like browsePlayers, when live + reachable we return the real result
+    // as-is — even when empty — rather than leaking far-away demo posts.)
+    if (!origin) return posts;
+    return posts.filter((p) => p.distance != null && p.distance <= maxDistance);
+  } catch (e) {
+    markUnreachable();
+    return mockData();
+  }
 }
 
 export async function createCourtPost(draft) {

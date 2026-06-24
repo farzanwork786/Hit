@@ -23,10 +23,13 @@ import * as api from '../lib/api';
 import { notifyMessage } from '../lib/notifications';
 import { KeyboardDoneBar, DONE_BAR_ID } from '../components/ui';
 import { RatingSummary } from '../components/SportIcon';
+import { useSport } from '../context/SportContext';
 import { colors, fonts, spacing, radius } from '../theme';
 
 export default function ChatDetailScreen({ route, navigation }) {
-  const { player, chatId: initialChatId, isRequest } = route.params;
+  const { player, chatId: initialChatId, isRequest, sport: routeSport } = route.params;
+  const { sport: activeSport } = useSport();
+  const sport = routeSport || activeSport;
   const [chatId, setChatId] = useState(initialChatId || null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(Boolean(initialChatId));
@@ -150,7 +153,7 @@ export default function ChatDetailScreen({ route, navigation }) {
     // Lazily create the conversation when replying to a brand-new request.
     let cid = chatId;
     if (!cid) {
-      const conv = await api.getOrCreateConversation(player.id);
+      const conv = await api.getOrCreateConversation(player.id, sport);
       if (conv?.id) {
         cid = conv.id;
         setChatId(cid);

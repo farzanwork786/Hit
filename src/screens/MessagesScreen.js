@@ -8,12 +8,15 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { EmptyState } from '../components/ui';
 import { RatingSummary } from '../components/SportIcon';
+import SportToggle from '../components/SportToggle';
 import { isBlocked } from '../lib/mockData';
 import * as api from '../lib/api';
 import { notifyMatchAccepted } from '../lib/notifications';
+import { useSport } from '../context/SportContext';
 import { colors, fonts, spacing, radius } from '../theme';
 
 export default function MessagesScreen({ navigation }) {
+  const { sport } = useSport();
   const [tab, setTab] = useState('chats');
   const [chats, setChats] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -33,11 +36,12 @@ export default function MessagesScreen({ navigation }) {
     setPendingRequests((prev) => prev.filter((r) => r.id !== request.id));
     notifyMatchAccepted(request.player);
     await api.acceptRequest(request.id);
-    const conv = await api.getOrCreateConversation(request.player.id);
+    const conv = await api.getOrCreateConversation(request.player.id, request.sport || sport);
     navigation.navigate('ChatDetail', {
       player: request.player,
       chatId: conv?.id || undefined,
       isRequest: !conv?.id,
+      sport: request.sport || sport,
     });
   }
 
@@ -46,13 +50,21 @@ export default function MessagesScreen({ navigation }) {
     await api.declineRequest(request.id);
   }
 
-  const visibleChats = chats.filter((c) => c.player && !isBlocked(c.player.id));
-  const visibleRequests = pendingRequests.filter((r) => r.player && !isBlocked(r.player.id));
+  // Untagged threads/requests (sport === null) show under both sports.
+  const matchesSport = (item) => !item.sport || item.sport === sport;
+  const visibleChats = chats.filter((c) => c.player && !isBlocked(c.player.id) && matchesSport(c));
+  const visibleRequests = pendingRequests.filter(
+    (r) => r.player && !isBlocked(r.player.id) && matchesSport(r)
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
+      </View>
+
+      <View style={styles.toggleRow}>
+        <SportToggle />
       </View>
 
       {/* Tab switcher */}
@@ -82,7 +94,7 @@ export default function MessagesScreen({ navigation }) {
           onRefresh={load}
           refreshing={false}
           renderItem={({ item }) => (
-            <ChatRow chat={item} onPress={() => navigation.navigate('ChatDetail', { player: item.player, chatId: item.id })} />
+            <ChatRow chat={item} onPress={() => navigation.navigate('ChatDetail', { player: item.player, chatId: item.id, sport: item.sport })} />
           )}
           contentContainerStyle={styles.list}
           ListEmptyComponent={<EmptyState icon="chatbubbles-outline" title="No chats yet" subtitle="Start a conversation from a player's profile." />}
@@ -180,6 +192,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.sm },
   title: { fontFamily: fonts.serif, fontSize: 28, color: colors.navy },
+  toggleRow: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   tabs: {
     flexDirection: 'row',

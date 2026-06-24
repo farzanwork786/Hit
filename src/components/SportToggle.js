@@ -1,5 +1,6 @@
 // Segmented tennis/pickleball toggle that switches the app-wide sport context.
-// When the user only plays one sport it renders as a subtle static chip.
+// Always shows both sports so anyone can move between tennis and pickleball
+// without having to edit their profile first.
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
@@ -9,17 +10,7 @@ import SportIcon from './SportIcon';
 import { colors, fonts, radius } from '../theme';
 
 export default function SportToggle({ style }) {
-  const { sport, setSport, playsBoth } = useSport();
-
-  if (!playsBoth) {
-    const s = SPORTS[sport];
-    return (
-      <View style={[styles.single, style]}>
-        <SportIcon sport={sport} size={14} color={colors.slate600} />
-        <Text style={styles.singleText}>{s.label}</Text>
-      </View>
-    );
-  }
+  const { sport, setSport } = useSport();
 
   return (
     <View style={[styles.track, style]}>
@@ -63,15 +54,4 @@ const styles = StyleSheet.create({
   },
   segText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.slate500 },
   segTextActive: { color: colors.white },
-  single: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: colors.slate100,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
-  },
-  singleText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.slate600 },
 });
