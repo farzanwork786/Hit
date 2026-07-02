@@ -49,8 +49,9 @@ export function SportChip({ sport, tone = 'blue', style }) {
   );
 }
 
-// Inline sport-icon + rating-label summary (e.g. "[tennis] UTR 7.8 · [pickleball] NR").
-// Skips ratings entirely for community accounts.
+// Inline sport-icon + skill-level summary (e.g. "[tennis] 4.5 · [pickleball] 3.0").
+// Falls back to the sport name when no skill level is set. Skips ratings
+// entirely for community accounts.
 export function RatingSummary({ player, size = 12, color = colors.slate400, textStyle }) {
   if (player?.isCommunity) return null;
   const sports = SPORT_KEYS.filter((s) => playsSport(player, s));
@@ -62,7 +63,7 @@ export function RatingSummary({ player, size = 12, color = colors.slate400, text
           {i > 0 ? <Text style={[styles.summaryDot, { color }]}>·</Text> : null}
           <SportIcon sport={s} size={size} color={color} />
           <Text style={[{ fontFamily: fonts.body, fontSize: size, color }, textStyle]}>
-            {ratingLabel(player, s)}
+            {ratingLabel(player, s) ?? SPORTS[s].label}
           </Text>
         </View>
       ))}

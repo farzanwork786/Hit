@@ -137,10 +137,10 @@ export default function MyProfileScreen({ navigation }) {
           <View style={styles.statsRow}>
             {sports.map((s) => (
               <View key={s} style={styles.statBox}>
-                <Text style={styles.statValue}>{ratingShort(user, s)}</Text>
+                <Text style={styles.statValue}>{ratingShort(user, s) ?? 'Not set'}</Text>
                 <View style={styles.statLabelRow}>
                   <SportIcon sport={s} size={12} color={colors.slate500} />
-                  <Text style={styles.statLabel}>{SPORTS[s].ratingName}</Text>
+                  <Text style={styles.statLabel}>Skill Level</Text>
                 </View>
                 {user.sports?.[s]?.style ? (
                   <Text style={styles.statStyle} numberOfLines={1}>

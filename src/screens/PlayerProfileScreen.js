@@ -167,15 +167,15 @@ export default function PlayerProfileScreen({ route, navigation }) {
                     {entry.style ? <Text style={styles.sportStyle}>{entry.style}</Text> : null}
                   </View>
                   <View style={styles.ratingBox}>
-                    <Text style={styles.ratingValue}>{ratingShort(player, s)}</Text>
-                    <Text style={styles.ratingLabel}>{meta.ratingName}</Text>
+                    <Text style={styles.ratingValue}>{ratingShort(player, s) ?? 'Not set'}</Text>
+                    <Text style={styles.ratingLabel}>Skill Level</Text>
                   </View>
                 </View>
               );
             })}
           </View>
           <Text style={styles.ratingDisclaimer}>
-            Self-reported skill level for matchmaking — not an official UTR or DUPR rating
+            Self-reported skill level for matchmaking
           </Text>
 
           {/* Quick facts */}

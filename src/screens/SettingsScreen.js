@@ -2,9 +2,9 @@
 //
 // Everything that can work offline persists via AsyncStorage (privacy &
 // notification prefs in SettingsContext; profile fields via AuthContext).
-// Things that genuinely need a backend (email/password change, UTR/DUPR
-// verification) show a polished "set up your account" notice instead of a dead
-// button. A search bar at the top filters every row by keyword.
+// Things that genuinely need a backend (email/password change) show a polished
+// "set up your account" notice instead of a dead button. A search bar at the
+// top filters every row by keyword.
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -92,8 +92,6 @@ export default function SettingsScreen({ navigation }) {
           { type: 'nav', icon: 'lock-closed-outline', label: 'Password', value: '••••••••', onPress: () => setFormType('password'), kw: 'password security' },
           { type: 'nav', icon: 'call-outline', label: 'Phone number', value: user.phone || 'Add', onPress: () => setFormType('phone'), kw: 'phone number recovery' },
           { type: 'nav', icon: 'at-outline', label: 'Username', value: `@${user.username || 'set-username'}`, onPress: () => setFormType('username'), kw: 'username handle' },
-          { type: 'link', icon: 'link-outline', label: 'Link UTR account', connected: a.utrLinked, kw: 'utr link tennis rating verify' },
-          { type: 'link', icon: 'link-outline', label: 'Link DUPR account', connected: a.duprLinked, kw: 'dupr link pickleball rating verify' },
         ],
       },
       {
@@ -101,7 +99,7 @@ export default function SettingsScreen({ navigation }) {
         desc: 'Edit how you appear to other players.',
         items: [
           { type: 'nav', icon: 'tennisball-outline', label: 'Sports', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'sport tennis pickleball add remove' },
-          { type: 'nav', icon: 'stats-chart-outline', label: 'Skill level', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'skill level utr dupr rating' },
+          { type: 'nav', icon: 'stats-chart-outline', label: 'Skill Level', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'skill level rating' },
           { type: 'nav', icon: 'options-outline', label: 'Playing style', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'playing style' },
           { type: 'nav', icon: 'calendar-outline', label: 'Availability', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'availability when play schedule' },
         ],
@@ -207,7 +205,7 @@ export default function SettingsScreen({ navigation }) {
         ))}
 
         <Text style={styles.footer}>
-          Hit v1.0.0 · Not affiliated with UTR or DUPR · Made for players
+          Hit v1.0.0 · Made for players
         </Text>
       </ScrollView>
 

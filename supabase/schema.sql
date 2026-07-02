@@ -84,7 +84,7 @@ create table if not exists public.player_sports (
   id        uuid primary key default uuid_generate_v4(),
   user_id   uuid not null references public.profiles (id) on delete cascade,
   sport     text not null check (sport in ('tennis','pickleball')),
-  rating    numeric(4,1),   -- UTR (tennis) or DUPR (pickleball); null = NR / not rated
+  rating    numeric(4,1),   -- self-reported Skill Level (tennis 2.0–7.0, pickleball 2.0–5.5); null = not set
   style     text,
   created_at timestamptz default now(),
   unique (user_id, sport)
@@ -100,7 +100,7 @@ create table if not exists public.user_settings (
   user_id       uuid primary key references public.profiles (id) on delete cascade,
   privacy       jsonb default '{"profileVisibility":"everyone","whoCanMessage":"everyone","hideAge":false,"hideDistance":false,"showInBrowse":true}'::jsonb,
   notifications jsonb default '{"push":true,"matchRequests":true,"messages":true,"communityPosts":true,"courtBoardReplies":true,"appUpdates":true}'::jsonb,
-  account       jsonb default '{"utrLinked":false,"duprLinked":false}'::jsonb,
+  account       jsonb default '{}'::jsonb,
   push_token    text,
   updated_at    timestamptz default now()
 );

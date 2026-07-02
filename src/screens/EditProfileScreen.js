@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Field, KeyboardDoneBar } from '../components/ui';
+import { SkillLevelPickerModal } from '../components/RatingSelector';
 import CityField from '../components/CityField';
 import SportIcon from '../components/SportIcon';
 import PhotoGrid from '../components/PhotoGrid';
@@ -25,7 +26,7 @@ import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
 import { currentUser, PLAYING_STYLES, AVAILABILITY_OPTIONS } from '../lib/mockData';
-import { SPORTS, SPORT_KEYS } from '../lib/ratings';
+import { SPORTS, SPORT_KEYS, levelDescription } from '../lib/ratings';
 import { colors, fonts, spacing, radius } from '../theme';
 
 const COMMUNITY_TYPES = ['Club', 'Park', 'Group'];
@@ -42,6 +43,7 @@ export default function EditProfileScreen({ navigation }) {
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [levelPickerSport, setLevelPickerSport] = useState(null);
   const [form, setForm] = useState({
     name: user.name || '',
     city: user.city || '',
@@ -69,7 +71,7 @@ export default function EditProfileScreen({ navigation }) {
     } else {
       const next = { ...form.sports };
       if (next[s]) delete next[s];
-      else next[s] = { [SPORTS[s].ratingKey]: null, style: PLAYING_STYLES[s][0] };
+      else next[s] = { rating: null, style: PLAYING_STYLES[s][0] };
       set({ sports: next });
     }
   }
@@ -235,9 +237,27 @@ export default function EditProfileScreen({ navigation }) {
                   </View>
                 </Pressable>
 
-                {/* Player-only: style + optional exact rating per sport */}
+                {/* Player-only: skill level + style per sport */}
                 {on && !isCommunity ? (
                   <View style={styles.sportDetail}>
+                    <Text style={styles.subLabel}>Skill Level</Text>
+                    <Pressable style={styles.levelRow} onPress={() => setLevelPickerSport(s)}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.levelValue}>
+                          {form.sports[s].rating != null
+                            ? form.sports[s].rating.toFixed(1)
+                            : 'Not set'}
+                        </Text>
+                        {form.sports[s].rating != null &&
+                        levelDescription(s, form.sports[s].rating) ? (
+                          <Text style={styles.levelDesc} numberOfLines={1}>
+                            {levelDescription(s, form.sports[s].rating)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={colors.slate400} />
+                    </Pressable>
+
                     <Text style={styles.subLabel}>Playing style</Text>
                     <View style={styles.chipWrap}>
                       {PLAYING_STYLES[s].map((st) => (
@@ -249,23 +269,6 @@ export default function EditProfileScreen({ navigation }) {
                         />
                       ))}
                     </View>
-                    <Field
-                      label={`${SPORTS[s].ratingName} rating (optional)`}
-                      keyboardType="decimal-pad"
-                      placeholder={`e.g. ${s === 'pickleball' ? '3.5' : '6.5'}`}
-                      value={
-                        form.sports[s][SPORTS[s].ratingKey] != null
-                          ? String(form.sports[s][SPORTS[s].ratingKey])
-                          : ''
-                      }
-                      onChangeText={(t) => {
-                        const cleaned = t.replace(/[^0-9.]/g, '');
-                        setSportField(s, {
-                          [SPORTS[s].ratingKey]: cleaned === '' ? null : parseFloat(cleaned),
-                        });
-                      }}
-                      style={{ marginTop: spacing.md, marginBottom: 0 }}
-                    />
                   </View>
                 ) : null}
               </View>
@@ -306,6 +309,14 @@ export default function EditProfileScreen({ navigation }) {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <SkillLevelPickerModal
+        visible={Boolean(levelPickerSport)}
+        sport={levelPickerSport || 'tennis'}
+        value={levelPickerSport ? form.sports[levelPickerSport]?.rating ?? null : null}
+        onSelect={(v) => levelPickerSport && setSportField(levelPickerSport, { rating: v })}
+        onClose={() => setLevelPickerSport(null)}
+      />
       <KeyboardDoneBar />
     </SafeAreaView>
   );
@@ -401,4 +412,17 @@ const styles = StyleSheet.create({
   check: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.slate300, alignItems: 'center', justifyContent: 'center' },
   checkActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   sportDetail: { paddingTop: spacing.md, paddingHorizontal: spacing.xs },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  levelValue: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.navy },
+  levelDesc: { fontFamily: fonts.body, fontSize: 12, color: colors.slate500, marginTop: 2 },
 });

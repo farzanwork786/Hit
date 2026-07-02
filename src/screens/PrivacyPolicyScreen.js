@@ -51,10 +51,10 @@ export default function PrivacyPolicyScreen({ navigation }) {
           <B>We do not sell your personal data to third parties.</B>
         </S>
 
-        <S title="3. Ratings Are Self-Reported">
-          Skill ratings you enter are visible to other users for matchmaking purposes
-          only. They are self-reported, not validated by UTR, DUPR, or any other
-          rating body, and are not shared with those organisations.
+        <S title="3. Skill Levels Are Self-Reported">
+          Skill Levels you enter are visible to other users for matchmaking purposes
+          only. They are self-reported, not validated by any rating body, and are
+          not shared with any rating organisation.
         </S>
 
         <S title="4. What We Share">

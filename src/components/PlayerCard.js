@@ -13,11 +13,18 @@ import { colors, fonts, radius, spacing, shadow } from '../theme';
 export default function PlayerCard({ player, sport = 'tennis', onPress }) {
   const meta = SPORTS[sport];
   const style = player.sports?.[sport]?.style;
+  const level = ratingShort(player, sport); // null when skill level not set
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.96 }]}>
       <View style={styles.cover}>
         <Image source={{ uri: player.cover }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
         <LinearGradient colors={['transparent', 'rgba(15,23,42,0.85)']} style={StyleSheet.absoluteFill} />
+        {level != null ? (
+          <View style={styles.levelBadge}>
+            <Ionicons name="stats-chart" size={11} color={colors.white} />
+            <Text style={styles.levelBadgeText}>{level}</Text>
+          </View>
+        ) : null}
         {player.distance != null ? (
           <View style={styles.distanceBadge}>
             <Ionicons name="location" size={12} color={colors.white} />
@@ -42,8 +49,12 @@ export default function PlayerCard({ player, sport = 'tennis', onPress }) {
 
       <View style={styles.body}>
         <View style={styles.ratingRow}>
-          <Rating label={meta.ratingName} value={ratingShort(player, sport) ?? '—'} />
-          <View style={styles.divider} />
+          {level != null ? (
+            <>
+              <Rating label="Skill Level" value={level} />
+              <View style={styles.divider} />
+            </>
+          ) : null}
           <Rating label="Hand" value={player.hand} small />
           <View style={styles.divider} />
           <View style={styles.rating}>
@@ -51,7 +62,9 @@ export default function PlayerCard({ player, sport = 'tennis', onPress }) {
             <Text style={styles.ratingLabel}>{meta.label}</Text>
           </View>
         </View>
-        <Text style={styles.ratingDisclaimer}>Self-reported skill level · not an official rating</Text>
+        {level != null ? (
+          <Text style={styles.ratingDisclaimer}>Self-reported skill level</Text>
+        ) : null}
         <View style={styles.tagRow}>
           {style ? <Tag label={style} tone="blue" icon="tennisball" /> : null}
         </View>
@@ -96,6 +109,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   distanceText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.white },
+  levelBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(37,99,235,0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  levelBadgeText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.white },
   coverFooter: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, gap: 10 },
   avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: colors.white },
   nameRow: { flexDirection: 'row', alignItems: 'center' },

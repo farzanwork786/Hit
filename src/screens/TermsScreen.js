@@ -31,29 +31,24 @@ export default function TermsScreen({ navigation }) {
         </S>
 
         <Alert icon="warning-outline">
-          <B>Ratings Disclaimer</B>
-          {'\n'}Skill ratings displayed in Hit — including values described as "UTR" or
-          "DUPR" — are{' '}
+          <B>Skill Level Disclaimer</B>
+          {'\n'}Skill Levels displayed in Hit are{' '}
           <B>self-reported estimates entered by users for matchmaking convenience
-          only</B>. They are{' '}
-          <B>NOT official UTR or DUPR ratings</B>, are not submitted to or verified by
-          those organisations, and should not be treated as such. Hit does not verify
-          any rating a user claims. Use them as a rough guide only.
+          only</B>. They are not official ratings, are not submitted to or verified
+          by any rating organisation, and should not be treated as such. Hit does
+          not verify any skill level a user claims. Use them as a rough guide only.
         </Alert>
 
         <Alert icon="information-circle-outline" color={colors.slate600} bg={colors.slate100}>
-          <B>No Affiliation with UTR, DUPR, or any Rating Body</B>
+          <B>No Affiliation with any Rating Body</B>
           {'\n'}Hit is an{' '}
           <B>independent application</B> and is{' '}
           <B>
             NOT affiliated with, endorsed by, sponsored by, or partnered with
           </B>{' '}
-          Universal Tennis (UTR), Dynamic Universal Pickleball Rating (DUPR), the
-          United States Tennis Association (USTA), USA Pickleball, or any other
-          official rating organisation or governing body. References to "UTR" and
-          "DUPR" in Hit are provided solely to help users communicate approximate skill
-          levels using familiar terminology. UTR and DUPR are registered trademarks of
-          their respective owners.
+          any official rating organisation or governing body for tennis or
+          pickleball. Skill Levels in Hit exist solely to help users communicate
+          approximate ability to each other.
         </Alert>
 
         <S title="3. In-Person Meetups — Safety & Your Responsibility">

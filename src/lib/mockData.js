@@ -3,8 +3,8 @@
 //
 // Player model:
 //   sports: {
-//     tennis:     { utr: 7.8, style: 'Aggressive Baseliner' },   // present if they play tennis
-//     pickleball: { dupr: 3.4, style: 'All-Around' },            // dupr: null = NR (not rated)
+//     tennis:     { rating: 4.5, style: 'Aggressive Baseliner' },  // present if they play tennis
+//     pickleball: { rating: 3.5, style: 'All-Around' },            // rating: null = skill level not set
 //   }
 //   friends: ['p1', ...]            ids of players they've connected with
 //   friendsVisibility: 'everyone' | 'friends' | 'me'
@@ -46,7 +46,7 @@ export const players = [
     city: 'Austin, TX',
     distance: 3.2,
     sports: {
-      tennis: { utr: 7.8, style: 'Aggressive Baseliner' },
+      tennis: { rating: 4.5, style: 'Aggressive Baseliner' },
     },
     hand: 'Right',
     bio: 'Former college player looking for competitive hitting partners on weekday evenings. I love long baseline rallies and a good tiebreak battle.',
@@ -69,8 +69,8 @@ export const players = [
     city: 'Round Rock, TX',
     distance: 8.6,
     sports: {
-      tennis: { utr: 6.1, style: 'Serve & Volley' },
-      pickleball: { dupr: 3.4, style: 'All-Around' },
+      tennis: { rating: 4.0, style: 'Serve & Volley' },
+      pickleball: { rating: 3.5, style: 'All-Around' },
     },
     hand: 'Right',
     bio: 'Weekend warrior playing both racquet sports. Big first serve on the tennis court, working on my third-shot drop on the pickleball court.',
@@ -92,10 +92,10 @@ export const players = [
     city: 'Cedar Park, TX',
     distance: 5.4,
     sports: {
-      tennis: { utr: 9.2, style: 'All-Court' },
+      tennis: { rating: 5.0, style: 'All-Court' },
     },
     hand: 'Left',
-    bio: 'Tournament player chasing UTR points. Looking for partners who can push me. Lefty with a heavy topspin forehand.',
+    bio: 'Tournament player always chasing the next win. Looking for partners who can push me. Lefty with a heavy topspin forehand.',
     availability: ['Early mornings', 'Weekday evenings'],
     verified: true,
     friends: ['me', 'p1', 'p6'],
@@ -115,8 +115,8 @@ export const players = [
     city: 'Austin, TX',
     distance: 2.1,
     sports: {
-      tennis: { utr: 4.5, style: 'Counterpuncher' },
-      pickleball: { dupr: null, style: 'Soft Game / Dinker' }, // brand new — NR
+      tennis: { rating: 3.5, style: 'Counterpuncher' },
+      pickleball: { rating: null, style: 'Soft Game / Dinker' }, // brand new — level not set
     },
     hand: 'Right',
     bio: 'Getting back into tennis after a long break, and just picked up a pickleball paddle. Looking for relaxed rallies and to slowly level up.',
@@ -137,7 +137,7 @@ export const players = [
     city: 'Pflugerville, TX',
     distance: 11.3,
     sports: {
-      tennis: { utr: 8.0, style: 'Aggressive Baseliner' },
+      tennis: { rating: 4.5, style: 'Aggressive Baseliner' },
     },
     hand: 'Right',
     bio: 'Competitive player who hits hard and flat. I play in two local leagues and am always looking for extra practice sets midweek.',
@@ -159,7 +159,7 @@ export const players = [
     city: 'Austin, TX',
     distance: 4.8,
     sports: {
-      tennis: { utr: 11.4, style: 'All-Court' },
+      tennis: { rating: 5.5, style: 'All-Court' },
     },
     hand: 'Right',
     bio: 'Ex-D1 player and current coach. Happy to hit with most levels and give a few pointers. Big topspin game and a reliable serve.',
@@ -182,7 +182,7 @@ export const players = [
     city: 'Austin, TX',
     distance: 6.1,
     sports: {
-      pickleball: { dupr: 4.2, style: 'Aggressive Driver' },
+      pickleball: { rating: 4.5, style: 'Aggressive Driver' },
     },
     hand: 'Right',
     bio: 'Pickleball addict — on the courts four mornings a week. Love fast hands battles at the kitchen. Always up for competitive rec games or tournament prep.',
@@ -203,7 +203,7 @@ export const players = [
     city: 'Cedar Park, TX',
     distance: 7.5,
     sports: {
-      pickleball: { dupr: 2.8, style: 'Soft Game / Dinker' },
+      pickleball: { rating: 3.0, style: 'Soft Game / Dinker' },
     },
     hand: 'Left',
     bio: 'Picked up pickleball six months ago and completely hooked. Working on my drops and resets — looking for patient partners around my level.',
@@ -245,8 +245,8 @@ export const currentUser = {
   ],
   city: 'Austin, TX',
   sports: {
-    tennis: { utr: 7.5, style: 'All-Court' },
-    pickleball: { dupr: 3.2, style: 'All-Around' },
+    tennis: { rating: 4.5, style: 'All-Court' },
+    pickleball: { rating: 3.5, style: 'All-Around' },
   },
   hand: 'Right',
   bio: 'Hitting partner wanted! All-court tennis player, and learning the soft game in pickleball. Love a competitive set followed by a coffee.',
@@ -299,8 +299,8 @@ export function isBlocked(id) { return blockedIds.has(id); }
 
 // Court Board posts (location-tagged "looking to play" requests), per sport.
 export const POST_LEVELS = {
-  tennis: ['Any level', 'UTR 1–3', 'UTR 3–5', 'UTR 5–7', 'UTR 7–9', 'UTR 9+'],
-  pickleball: ['Any level', 'NR / New', 'DUPR 2.0–3.0', 'DUPR 3.0–4.0', 'DUPR 4.0–5.0', 'DUPR 5.0+'],
+  tennis: ['Any level', '2.0–3.0', '3.0–4.0', '4.0–5.0', '5.0–6.0', '6.0+'],
+  pickleball: ['Any level', '2.0–3.0', '3.0–4.0', '4.0–5.0', '5.0+'],
 };
 
 export const courtPosts = [
@@ -313,7 +313,7 @@ export const courtPosts = [
     city: 'Austin, TX',
     distance: 5.4,
     when: 'Today, 6:30 PM',
-    level: 'UTR 7–9',
+    level: '4.0–5.0',
     text: 'Lost my hitting partner for tonight. Looking for a competitive set or two under the lights. Bring new balls!',
     likes: 8,
     comments: 3,
@@ -327,7 +327,7 @@ export const courtPosts = [
     city: 'Round Rock, TX',
     distance: 8.6,
     when: 'Saturday, 10:00 AM',
-    level: 'UTR 3–5',
+    level: '3.0–4.0',
     text: 'Putting together a friendly doubles group Saturday morning. Need one or two more. All welcome, low pressure!',
     likes: 14,
     comments: 6,
@@ -341,7 +341,7 @@ export const courtPosts = [
     city: 'Austin, TX',
     distance: 4.8,
     when: 'Sunday, 8:00 AM',
-    level: 'UTR 9+',
+    level: '5.0–6.0',
     text: 'Early bird singles before it gets hot. Strong players only please — looking to get a real workout in. Best of 3 sets.',
     likes: 5,
     comments: 1,
@@ -355,7 +355,7 @@ export const courtPosts = [
     city: 'Austin, TX',
     distance: 3.2,
     when: 'Wednesday, 7:00 PM',
-    level: 'UTR 7–9',
+    level: '4.0–5.0',
     text: 'Anyone want to drill for an hour then play a set? Working on my approach shots and could use a partner to rally with.',
     likes: 11,
     comments: 4,
@@ -369,7 +369,7 @@ export const courtPosts = [
     city: 'Austin, TX',
     distance: 6.1,
     when: 'Tomorrow, 8:00 AM',
-    level: 'DUPR 4.0–5.0',
+    level: '4.0–5.0',
     text: 'Two courts booked for tournament prep. Need one more strong player for competitive doubles rotation. Fast hands required!',
     likes: 9,
     comments: 5,
@@ -383,7 +383,7 @@ export const courtPosts = [
     city: 'Cedar Park, TX',
     distance: 7.5,
     when: 'Saturday, 9:00 AM',
-    level: 'DUPR 2.0–3.0',
+    level: '2.0–3.0',
     text: 'Beginner-friendly open play Saturday morning! Bring a paddle and good vibes — we rotate partners every game. New players very welcome.',
     likes: 21,
     comments: 8,
@@ -397,7 +397,7 @@ export const courtPosts = [
     city: 'Austin, TX',
     distance: 4.2,
     when: 'Thursday, 6:00 PM',
-    level: 'DUPR 3.0–4.0',
+    level: '3.0–4.0',
     text: 'Indoor courts reserved Thursday evening. Looking for 3.0-3.5 players for some games — working on my kitchen patience 😅',
     likes: 6,
     comments: 2,
@@ -467,7 +467,7 @@ export const communities = [
         id: 'b1',
         authorType: 'community',
         author: null,
-        text: '📣 Round-robin tournament this weekend at Austin Pickle Ranch! Divisions for every DUPR band, NR players get a free intro clinic at 8 AM. Register by Friday.',
+        text: '📣 Round-robin tournament this weekend at Austin Pickle Ranch! Divisions for every skill level, brand-new players get a free intro clinic at 8 AM. Register by Friday.',
         timeAgo: '2h',
         pinned: true,
         likes: 58,
@@ -476,7 +476,7 @@ export const communities = [
         id: 'b2',
         authorType: 'player',
         author: players[6],
-        text: 'Morning crew was 20 deep today. If you are NR or 2.5 and nervous about open play — come at 8, we set aside two courts for newer players.',
+        text: 'Morning crew was 20 deep today. If you are around a 2.5 and nervous about open play — come at 8, we set aside two courts for newer players.',
         timeAgo: '5h',
         pinned: false,
         likes: 19,
@@ -584,7 +584,7 @@ export const requests = [
 export const messagesByChat = {
   c1: [
     { id: 'm1', fromMe: false, text: 'Hey Alex! Saw your profile, want to hit this week?', time: '1:40 PM' },
-    { id: 'm2', fromMe: true, text: 'Absolutely. We are close in UTR so should be a good match.', time: '1:45 PM' },
+    { id: 'm2', fromMe: true, text: 'Absolutely. Our skill levels are close so it should be a good match.', time: '1:45 PM' },
     { id: 'm3', fromMe: false, text: 'Great. Pharr Tennis Center works for me. Tonight?', time: '2:01 PM' },
     { id: 'm4', fromMe: true, text: 'Tonight works. 6:30?', time: '2:10 PM' },
     { id: 'm5', fromMe: false, text: 'Perfect, see you at 6:30 then!', time: '2:14 PM' },

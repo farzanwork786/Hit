@@ -7,7 +7,8 @@
 // in demo mode and surface real permission/validation errors when live.
 //
 // Shapes returned here match what the screens already expect (e.g. a player has
-// `sports: { tennis: { utr, style }, pickleball: { dupr, style } }`).
+// `sports: { tennis: { rating, style }, pickleball: { rating, style } }`,
+// where `rating` is the self-reported Skill Level or null when not set).
 
 import * as Location from 'expo-location';
 import {

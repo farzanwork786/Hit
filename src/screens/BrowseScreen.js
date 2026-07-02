@@ -258,7 +258,7 @@ function FilterPanel({ sport, filters, setFilters, onReset, onClose, onOpenGuide
         </RangeRow>
 
         <View style={styles.rangeHead}>
-          <Text style={styles.filterLabel}>{meta.ratingName} range</Text>
+          <Text style={styles.filterLabel}>Skill Level range</Text>
           <Pressable onPress={onOpenGuide} hitSlop={8}>
             <Text style={styles.guideLink}>What's my level?</Text>
           </Pressable>

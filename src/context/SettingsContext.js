@@ -30,10 +30,7 @@ export const DEFAULT_SETTINGS = {
     courtBoardReplies: true,
     appUpdates: false,
   },
-  account: {
-    utrLinked: false,
-    duprLinked: false,
-  },
+  account: {},
 };
 
 // Deep-merge persisted values onto defaults so new keys always exist.

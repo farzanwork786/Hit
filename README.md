@@ -1,14 +1,14 @@
 # Hit 🎾
 
-A tennis player matching app built with **Expo + React Native** and **Supabase**.
-Find hitting partners near you by skill (NTRP / UTR), playing style and schedule.
+A tennis & pickleball player matching app built with **Expo + React Native** and **Supabase**.
+Find hitting partners near you by self-reported Skill Level, playing style and schedule.
 
 ## Features
 
 - **Onboarding** — branded splash, 18+ age gate, account type (self / child) and a
   3‑step registration wizard (account → tennis profile → location).
 - **Browse players** — rich player cards with a collapsible filter panel
-  (distance, NTRP range, UTR range, playing style).
+  (distance, Skill Level range, playing style).
 - **Player profile** — full‑screen profile with stats, availability, gallery and
   a sticky match/like action bar.
 - **Court Board** — a location‑tagged feed of "looking to play" posts with a

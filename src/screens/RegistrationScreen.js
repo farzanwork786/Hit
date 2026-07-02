@@ -22,7 +22,7 @@ import CityField from '../components/CityField';
 import SportIcon from '../components/SportIcon';
 import { useAuth } from '../context/AuthContext';
 import { REG_STYLES } from '../lib/mockData';
-import { SPORTS, SPORT_KEYS, skillGroupsFor, bandsFor } from '../lib/ratings';
+import { SPORTS, SPORT_KEYS } from '../lib/ratings';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
 const COMMUNITY_TYPES = ['Club', 'Park', 'Group'];
@@ -33,32 +33,20 @@ const COMMUNITY_PHOTOS = [
   'https://images.unsplash.com/photo-1530915365347-e35b749a0381?w=900&q=80',
 ];
 
-const emptySport = (sport) => ({ groupId: null, bandId: null, exact: '', style: REG_STYLES[sport][0] });
+const emptySport = (sport) => ({ rating: null, style: REG_STYLES[sport][0] });
 
-// Resolve a sport's wizard selections into a stored numeric rating.
-// Precedence: exact value → detailed band midpoint → broad group value.
+// Resolve a sport's wizard selections into the stored shape.
 function resolveSports(formSports) {
   const out = {};
   for (const s of SPORT_KEYS) {
     const sp = formSports[s];
     if (!sp) continue;
     const meta = SPORTS[s];
-    let value = sp.exact ? parseFloat(sp.exact) : NaN;
-    if (Number.isNaN(value)) {
-      if (sp.bandId) {
-        const band = bandsFor(s).find((b) => b.id === sp.bandId);
-        value = band && band.min !== null ? (band.min + band.max) / 2 : null;
-      } else {
-        const group = skillGroupsFor(s).find((g) => g.id === sp.groupId);
-        value = group ? group.value : null;
-      }
-    }
-    if (typeof value === 'number' && !Number.isNaN(value)) {
+    let value = typeof sp.rating === 'number' ? sp.rating : null;
+    if (value != null) {
       value = Math.round(Math.min(Math.max(value, meta.min), meta.max) * 10) / 10;
-    } else {
-      value = null;
     }
-    out[s] = { [meta.ratingKey]: value, style: sp.style };
+    out[s] = { rating: value, style: sp.style };
   }
   return out;
 }
@@ -128,7 +116,7 @@ export default function RegistrationScreen({ navigation }) {
     if (label === 'Your level') {
       for (const s of selectedSports) {
         const sp = form.sports[s];
-        if (!sp.groupId && !sp.bandId && !sp.exact) e[`level-${s}`] = `Pick your ${SPORTS[s].label.toLowerCase()} level.`;
+        if (sp.rating == null) e[`level-${s}`] = `Pick your ${SPORTS[s].label.toLowerCase()} skill level.`;
       }
     }
     if (label === 'Location' && !form.city.trim()) e.city = 'Required';
@@ -345,7 +333,7 @@ function StepSports({ isCommunity, selected, onToggle, error }) {
       <Text style={styles.lead}>
         {isCommunity
           ? 'Which sports does your community offer? Pick one or both.'
-          : "Pick one or both. Each sport keeps its own rating — skill doesn't transfer between them."}
+          : "Pick one or both. Each sport keeps its own Skill Level — skill doesn't transfer between them."}
       </Text>
       {SPORT_KEYS.map((key) => {
         const active = isOn(key);
@@ -355,7 +343,9 @@ function StepSports({ isCommunity, selected, onToggle, error }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.sportTitle}>{SPORTS[key].label}</Text>
               <Text style={styles.sportDesc}>
-                {key === 'tennis' ? 'Rated with UTR' : 'Rated with DUPR (or NR if new)'}
+                {key === 'tennis'
+                  ? 'Skill levels from 2.0 to 7.0'
+                  : 'Skill levels from 2.0 to 5.5'}
               </Text>
             </View>
             <View style={[styles.check, active && styles.checkActive]}>
@@ -374,7 +364,7 @@ function StepLevel({ form, selectedSports, setSportField, set, errors, onOpenGui
   const [showBio, setShowBio] = useState(Boolean(form.bio));
   return (
     <View>
-      <Text style={styles.lead}>No number knowledge needed — just pick what sounds like you.</Text>
+      <Text style={styles.lead}>Pick the Skill Level that sounds most like you.</Text>
 
       {/* One-time self-assessment disclosure */}
       <View style={styles.ratingNote}>
@@ -382,8 +372,7 @@ function StepLevel({ form, selectedSports, setSportField, set, errors, onOpenGui
         <Text style={styles.ratingNoteText}>
           The level you choose is a{' '}
           <Text style={{ fontFamily: fonts.bodyBold }}>self-assessment for matchmaking only</Text>
-          . It is not verified by UTR, DUPR, or any official rating organisation. You
-          can update it anytime from your profile.
+          . You can update it anytime from your profile.
         </Text>
       </View>
 
@@ -421,8 +410,6 @@ function StepLevel({ form, selectedSports, setSportField, set, errors, onOpenGui
 }
 
 function SportLevelBlock({ sport, sp, setSportField, error, onOpenGuide }) {
-  const [showDetail, setShowDetail] = useState(Boolean(sp.bandId || sp.exact));
-  const groups = skillGroupsFor(sport);
   const meta = SPORTS[sport];
 
   return (
@@ -430,69 +417,18 @@ function SportLevelBlock({ sport, sp, setSportField, error, onOpenGuide }) {
       <View style={styles.sportHead}>
         <View style={styles.sportHeadLeft}>
           <SportIcon sport={sport} size={18} color={colors.navy} />
-          <Text style={styles.sportHeadTitle}>{meta.label}</Text>
+          <Text style={styles.sportHeadTitle}>{meta.label} Skill Level</Text>
         </View>
         <Pressable onPress={onOpenGuide} hitSlop={8}>
           <Text style={styles.guideLink}>What's my level?</Text>
         </Pressable>
       </View>
 
-      {/* Prominent "new / not sure" card */}
-      {groups
-        .filter((g) => g.isNew)
-        .map((g) => {
-          const active = sp.groupId === g.id && !sp.bandId && !sp.exact;
-          return (
-            <Pressable
-              key={g.id}
-              onPress={() => setSportField({ groupId: g.id, bandId: null, exact: '' })}
-              style={[styles.newCard, active && styles.newCardActive]}
-            >
-              <Text style={styles.newSprout}>🌱</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.newTitle}>I'm new / not sure of my level</Text>
-                <Text style={styles.newDesc}>That's totally fine! We'll start you as a beginner — update anytime.</Text>
-              </View>
-              {active ? <Ionicons name="checkmark-circle" size={22} color={colors.blue} /> : null}
-            </Pressable>
-          );
-        })}
-
-      {/* Broad groups */}
-      <View style={styles.groupRow}>
-        {groups
-          .filter((g) => !g.isNew)
-          .map((g) => {
-            const active = sp.groupId === g.id && !sp.bandId && !sp.exact;
-            return (
-              <Pressable
-                key={g.id}
-                onPress={() => setSportField({ groupId: g.id, bandId: null, exact: '' })}
-                style={[styles.groupCard, active && styles.groupCardActive]}
-              >
-                <Text style={[styles.groupLabel, active && { color: colors.blue }]}>{g.label}</Text>
-                <Text style={styles.groupBlurb}>{g.blurb}</Text>
-              </Pressable>
-            );
-          })}
-      </View>
-
-      {/* Optional detailed bands */}
-      <Pressable onPress={() => setShowDetail((v) => !v)} hitSlop={8} style={styles.detailToggle}>
-        <Ionicons name={showDetail ? 'chevron-up' : 'chevron-down'} size={16} color={colors.blue} />
-        <Text style={styles.guideLink}>
-          {showDetail ? 'Hide detail' : `More detail (optional) — pick an exact ${meta.ratingName} band`}
-        </Text>
-      </Pressable>
-      {showDetail ? (
-        <RatingSelector
-          sport={sport}
-          selectedBandId={sp.bandId}
-          onSelectBand={(b) => setSportField({ bandId: b.id, groupId: null })}
-          exactValue={sp.exact}
-          onChangeExact={(v) => setSportField({ exact: v })}
-        />
-      ) : null}
+      <RatingSelector
+        sport={sport}
+        value={sp.rating}
+        onSelect={(v) => setSportField({ rating: v })}
+      />
 
       {error ? <Text style={styles.submitError}>{error}</Text> : null}
 
