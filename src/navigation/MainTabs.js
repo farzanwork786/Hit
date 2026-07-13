@@ -24,6 +24,7 @@ const ICONS = {
 export default function MainTabs() {
   return (
     <Tab.Navigator
+      initialRouteName="CourtBoard"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.blue,
@@ -42,8 +43,8 @@ export default function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Browse" component={BrowseScreen} options={{ title: 'Browse' }} />
       <Tab.Screen name="CourtBoard" component={CourtBoardScreen} options={{ title: 'Court Board' }} />
+      <Tab.Screen name="Browse" component={BrowseScreen} options={{ title: 'Browse' }} />
       <Tab.Screen name="Communities" component={CommunitiesScreen} options={{ title: 'Communities' }} />
       <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages' }} />
       <Tab.Screen name="MyProfile" component={MyProfileScreen} options={{ title: 'Profile' }} />
