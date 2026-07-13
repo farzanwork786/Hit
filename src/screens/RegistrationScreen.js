@@ -1,6 +1,6 @@
 // Registration wizard. Two flows depending on the chosen account type:
-//   • Player (self/child): Account → Your sports → Your level → Location
-//   • Community/club:       Your club → Sports → Location   (no skill/ratings)
+//   • Player (self):    Account → Your sports → Your level → Location
+//   • Community/club:   Your club → Sports → Location   (no skill/ratings)
 import React, { useState } from 'react';
 import {
   View,

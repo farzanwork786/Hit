@@ -1,4 +1,5 @@
-// Account type — is the player setting up for themselves or for a child?
+// Account type — personal player profile or a community/club page. Hit is
+// 18+ only (enforced by the age gate before this screen).
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,13 +14,7 @@ const OPTIONS = [
     key: 'self',
     icon: 'person-circle-outline',
     title: 'For myself',
-    desc: 'Create your own player profile and start matching with players near you.',
-  },
-  {
-    key: 'child',
-    icon: 'people-circle-outline',
-    title: 'For my child',
-    desc: 'Manage a junior profile as a parent or guardian. You stay in control of messaging.',
+    desc: 'Create your own player profile and start connecting with players near you.',
   },
   {
     key: 'community',
@@ -52,7 +47,7 @@ export default function AccountTypeScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Who is this{'\n'}account for?</Text>
-        <Text style={styles.subtitle}>You can add more profiles later from settings.</Text>
+        <Text style={styles.subtitle}>Set up a player profile, or a page for your club or group.</Text>
 
         <View style={{ marginTop: spacing.xl }}>
           {OPTIONS.map((o) => {

@@ -20,7 +20,7 @@ const STORAGE_KEYS = {
 
 const DEFAULT_ONBOARDING = {
   ageVerified: false,
-  accountType: null, // 'self' | 'child' | 'community'
+  accountType: null, // 'self' | 'community'
   registered: false,
   draft: {}, // partial registration data between steps
   pendingProfile: null, // profile to flush to Supabase once a session exists
