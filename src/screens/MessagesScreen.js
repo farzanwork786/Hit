@@ -114,7 +114,7 @@ export default function MessagesScreen({ navigation }) {
             />
           )}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState icon="mail-outline" title="No requests" subtitle="New match requests will show up here." />}
+          ListEmptyComponent={<EmptyState icon="mail-outline" title="No requests" subtitle="New play requests will show up here." />}
         />
       )}
     </SafeAreaView>

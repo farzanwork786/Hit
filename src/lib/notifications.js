@@ -69,11 +69,11 @@ async function scheduleLocalNotification(title, body, data = {}, delaySecs = 3) 
 // so the flow can be demoed end-to-end without a backend.
 // ---------------------------------------------------------------------------
 
-// Recipient gets this when someone sends them a match request.
+// Recipient gets this when someone sends them a play request.
 export function notifyMatchRequest(fromPlayer) {
   scheduleLocalNotification(
     `${fromPlayer.name} wants to play`,
-    'You have a new match request. Tap to review.',
+    'You have a new play request. Tap to review.',
     { type: NOTIF_TYPES.MATCH_REQUEST, playerId: fromPlayer.id }
   );
 }
@@ -81,7 +81,7 @@ export function notifyMatchRequest(fromPlayer) {
 // Sender gets this when their request is accepted.
 export function notifyMatchAccepted(player) {
   scheduleLocalNotification(
-    "You're matched!",
+    "You're set to play!",
     `${player.name} accepted your request. Say hi!`,
     { type: NOTIF_TYPES.MATCH_ACCEPTED, playerId: player.id },
     2

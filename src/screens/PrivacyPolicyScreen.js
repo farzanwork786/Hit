@@ -43,8 +43,8 @@ export default function PrivacyPolicyScreen({ navigation }) {
 
         <S title="2. How We Use Your Data">
           We use your information to:{'\n\n'}
-          • Match you with nearby players and communities.{'\n'}
-          • Facilitate messaging between matched players.{'\n'}
+          • Connect you with nearby players and communities.{'\n'}
+          • Facilitate messaging between connected players.{'\n'}
           • Send push notifications you have opted in to receive.{'\n'}
           • Improve app features, fix bugs, and understand usage patterns.{'\n'}
           • Comply with legal obligations and enforce our Terms of Service.{'\n\n'}
@@ -78,7 +78,7 @@ export default function PrivacyPolicyScreen({ navigation }) {
           • Turn off push notifications from Settings → Notifications.{'\n'}
           • Delete your account and all associated data from Settings → Account actions
           → Delete account.{'\n\n'}
-          Deleting your account removes your profile, photos, messages, and matches
+          Deleting your account removes your profile, photos, messages, and connections
           permanently from our servers.
         </S>
 

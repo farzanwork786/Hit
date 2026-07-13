@@ -34,10 +34,10 @@ export default function SplashScreen({ navigation }) {
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.title}>Find your{'\n'}perfect match.</Text>
+          <Text style={styles.title}>Find your{'\n'}next hit.</Text>
           <Text style={styles.subtitle}>
             Connect with tennis and pickleball players near you by skill, style and schedule.
-            Find your match, play more, level up.
+            Find players, play more, level up.
           </Text>
         </View>
 

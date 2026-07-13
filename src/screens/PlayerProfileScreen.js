@@ -282,7 +282,7 @@ export default function PlayerProfileScreen({ route, navigation }) {
         </Pressable>
         <View style={{ flex: 1 }}>
           <AppButton
-            title="Send match request"
+            title="Ask to play"
             icon="tennisball"
             onPress={sendRequest}
           />

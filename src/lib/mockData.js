@@ -599,9 +599,9 @@ export const messagesByChat = {
 };
 
 export const notifications = [
-  { id: 'n1', type: 'request', player: players[3], text: 'sent you a match request', time: '1h', unread: true },
+  { id: 'n1', type: 'request', player: players[3], text: 'asked to play', time: '1h', unread: true },
   { id: 'n2', type: 'message', player: players[0], text: 'sent you a message', time: '2h', unread: true },
-  { id: 'n3', type: 'match', player: players[6], text: 'accepted your match request', time: '5h', unread: false },
+  { id: 'n3', type: 'match', player: players[6], text: 'accepted your play request', time: '5h', unread: false },
   { id: 'n4', type: 'like', player: players[2], text: 'liked your Court Board post', time: '1d', unread: false },
   { id: 'n5', type: 'system', player: null, text: 'Your profile was verified ✓', time: '2d', unread: false },
 ];

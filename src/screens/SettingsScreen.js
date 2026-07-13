@@ -31,7 +31,7 @@ import { colors, fonts, spacing, radius } from '../theme';
 
 const VIS_3 = [
   { key: 'everyone', label: 'Everyone' },
-  { key: 'matches', label: 'Matches only' },
+  { key: 'matches', label: 'Connections only' },
   { key: 'nobody', label: 'Nobody' },
 ];
 const VIS_FRIENDS = [
@@ -63,7 +63,7 @@ export default function SettingsScreen({ navigation }) {
   function confirmDelete() {
     Alert.alert(
       'Delete account?',
-      'This permanently removes your profile, photos, matches and messages. This cannot be undone.',
+      'This permanently removes your profile, photos, connections and messages. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -121,7 +121,7 @@ export default function SettingsScreen({ navigation }) {
         title: 'Notifications',
         items: [
           { type: 'toggle', icon: 'notifications-outline', label: 'Push notifications', desc: 'Master switch for all push alerts.', value: n.push, onChange: (v) => update('notifications', { push: v }), kw: 'push notifications master' },
-          { type: 'toggle', icon: 'tennisball-outline', label: 'New match requests', value: n.matchRequests, disabled: !n.push, onChange: (v) => update('notifications', { matchRequests: v }), kw: 'match requests' },
+          { type: 'toggle', icon: 'tennisball-outline', label: 'New play requests', value: n.matchRequests, disabled: !n.push, onChange: (v) => update('notifications', { matchRequests: v }), kw: 'play match requests' },
           { type: 'toggle', icon: 'chatbubbles-outline', label: 'New messages', value: n.messages, disabled: !n.push, onChange: (v) => update('notifications', { messages: v }), kw: 'messages chat' },
           { type: 'toggle', icon: 'people-outline', label: 'Community posts', value: n.communityPosts, disabled: !n.push, onChange: (v) => update('notifications', { communityPosts: v }), kw: 'community posts board' },
           { type: 'toggle', icon: 'megaphone-outline', label: 'Court Board replies', value: n.courtBoardReplies, disabled: !n.push, onChange: (v) => update('notifications', { courtBoardReplies: v }), kw: 'court board replies' },
