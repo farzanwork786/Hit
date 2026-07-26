@@ -26,7 +26,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { KeyboardDoneBar, DONE_BAR_ID } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { currentUser, blockedIds } from '../lib/mockData';
+import { blockedIds } from '../lib/mockData';
+import { EMPTY_PROFILE } from '../lib/profile';
 import { colors, fonts, spacing, radius } from '../theme';
 
 const VIS_3 = [
@@ -43,7 +44,7 @@ const VIS_FRIENDS = [
 export default function SettingsScreen({ navigation }) {
   const { profile, updateProfile, signOut, deleteAccount } = useAuth();
   const { settings, update } = useSettings();
-  const user = profile || currentUser;
+  const user = profile || EMPTY_PROFILE;
 
   const [query, setQuery] = useState('');
   const [formType, setFormType] = useState(null); // 'email'|'password'|'phone'|'username'

@@ -1,13 +1,12 @@
 // Global sport context — switches the whole app between Tennis and Pickleball.
 // Browse, Court Board and Communities all read the current sport from here.
 //
-// The set of sports the user plays is derived from their actual profile (the
-// registered account), falling back to the demo seed user. A single-sport user
-// defaults to their sport and the toggle renders as a subtle static chip.
+// The set of sports the user plays is derived from their actual profile. It
+// never falls back to demo data; an unknown profile just defaults to tennis,
+// and anyone can switch freely with the toggle.
 
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { currentUser } from '../lib/mockData';
 import { SPORT_KEYS } from '../lib/ratings';
 
 const SportContext = createContext(null);
@@ -17,7 +16,7 @@ function sportsFromProfile(profile) {
   const src = profile?.sports;
   if (Array.isArray(src)) return SPORT_KEYS.filter((s) => src.includes(s));
   if (src && typeof src === 'object') return SPORT_KEYS.filter((s) => src[s]);
-  return SPORT_KEYS.filter((s) => currentUser.sports?.[s]);
+  return [];
 }
 
 export function SportProvider({ children }) {

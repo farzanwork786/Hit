@@ -14,7 +14,7 @@ import SportIcon, { SportChip } from '../components/SportIcon';
 import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
-import { currentUser } from '../lib/mockData';
+import { EMPTY_PROFILE } from '../lib/profile';
 import { SPORTS, SPORT_KEYS, playsSport, ratingShort } from '../lib/ratings';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
@@ -24,7 +24,9 @@ const TILE = (width - spacing.xl * 2 - GRID_GAP * 2) / 3;
 
 export default function MyProfileScreen({ navigation }) {
   const { profile, signOut, updateProfile, session } = useAuth();
-  const user = profile || currentUser;
+  // Never fall back to a stand-in person: while the real profile loads we show
+  // an empty shell rather than someone else's name, photos and friends.
+  const user = profile || EMPTY_PROFILE;
   useIsFocused(); // re-render on focus so joins/edits reflect immediately
 
   const [friends, setFriends] = useState([]);
@@ -35,8 +37,11 @@ export default function MyProfileScreen({ navigation }) {
     useCallback(() => {
       let active = true;
       (async () => {
-        const uid = session?.user?.id;
-        const [f, c] = await Promise.all([api.getFriends(uid || 'me'), api.getMyCommunities()]);
+        const uid = session?.user?.id ?? profile?.id ?? null;
+        const [f, c] = await Promise.all([
+          uid ? api.getFriends(uid) : Promise.resolve([]),
+          api.getMyCommunities(),
+        ]);
         if (active) {
           setFriends(f);
           setMyCommunities(c);

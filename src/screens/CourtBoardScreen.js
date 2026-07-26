@@ -22,7 +22,8 @@ import { Tag, IconButton, EmptyState, Field, AppButton, KeyboardDoneBar } from '
 import SportToggle from '../components/SportToggle';
 import SportIcon from '../components/SportIcon';
 import CityField from '../components/CityField';
-import { currentUser, POST_LEVELS } from '../lib/mockData';
+import { POST_LEVELS } from '../lib/mockData';
+import { EMPTY_PROFILE } from '../lib/profile';
 import * as api from '../lib/api';
 import { notifyCourtBoardReply } from '../lib/notifications';
 import { SPORTS } from '../lib/ratings';
@@ -37,9 +38,9 @@ export default function CourtBoardScreen({ navigation }) {
   const { sport } = useSport();
   const { activeLocation, activeCoords } = useLocation();
   const { profile, session, isSupabaseConfigured } = useAuth();
-  // Identifies "my" posts so only they get edit/delete. Falls back to the mock
-  // user id in demo mode.
-  const myId = session?.user?.id || currentUser.id;
+  // Identifies "my" posts so only they get edit/delete.
+  const me = profile || EMPTY_PROFILE;
+  const myId = session?.user?.id || me.id;
 
   const [maxDistance, setMaxDistance] = useState(25);
   const [posts, setPosts] = useState([]);
@@ -92,12 +93,7 @@ export default function CourtBoardScreen({ navigation }) {
 
   // Author shape for optimistic posts — uses my real id so the post is
   // immediately recognised as mine (edit/delete available right away).
-  const myAuthor = {
-    ...currentUser,
-    id: myId,
-    name: profile?.name || currentUser.name,
-    avatar: profile?.avatar || currentUser.avatar,
-  };
+  const myAuthor = { ...me, id: myId };
 
   async function addPost(draft) {
     setComposerOpen(false);
@@ -124,7 +120,7 @@ export default function CourtBoardScreen({ navigation }) {
       sport,
       author: myAuthor,
       timeAgo: 'now',
-      city: draft.city || activeLocation || profile?.city || currentUser.city,
+      city: draft.city || activeLocation || me.city,
       distance: 0,
       likes: 0,
       comments: 0,
@@ -221,7 +217,7 @@ export default function CourtBoardScreen({ navigation }) {
               onPress={() => item.author && navigation.navigate('PlayerProfile', { player: item.author })}
               onReply={async () => {
                 if (!item.author || isMine) return;
-                notifyCourtBoardReply(currentUser);
+                notifyCourtBoardReply(me);
                 const conv = await api.getOrCreateConversation(item.author.id, item.sport || sport);
                 navigation.navigate('ChatDetail', {
                   player: item.author,
@@ -258,7 +254,7 @@ export default function CourtBoardScreen({ navigation }) {
         key={`${sport}-${activeLocation}-${editingPost?.id || 'new'}`}
         visible={composerOpen}
         sport={sport}
-        defaultLocation={activeLocation || currentUser.city}
+        defaultLocation={activeLocation || me.city}
         editingPost={editingPost}
         onClose={() => {
           setComposerOpen(false);

@@ -22,12 +22,17 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Tag, KeyboardDoneBar, DONE_BAR_ID } from '../components/ui';
 import { SportChip } from '../components/SportIcon';
-import { currentUser, getPlayer } from '../lib/mockData';
+import { getPlayer } from '../lib/mockData';
+import { EMPTY_PROFILE } from '../lib/profile';
+import { isSupabaseConfigured } from '../lib/supabase';
 import * as api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
 export default function CommunityDetailScreen({ route, navigation }) {
   const { communityId } = route.params;
+  const { profile } = useAuth();
+  const me = profile || EMPTY_PROFILE;
   const [community, setCommunity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [joined, setJoined] = useState(false);
@@ -52,8 +57,9 @@ export default function CommunityDetailScreen({ route, navigation }) {
 
   const members = useMemo(() => {
     if (!community) return [];
-    // Live: profiles came back with the community. Demo: resolve ids via mock.
-    if (community.memberProfiles?.length) return community.memberProfiles;
+    // Live: profiles came back with the community — that's the only source.
+    if (isSupabaseConfigured) return community.memberProfiles || [];
+    // Demo mode only: resolve seed ids through the mock directory.
     return (community.members || []).map((id) => getPlayer(id)).filter(Boolean);
   }, [community]);
 
@@ -84,7 +90,7 @@ export default function CommunityDetailScreen({ route, navigation }) {
       {
         id: `local-${Date.now()}`,
         authorType: 'player',
-        author: currentUser,
+        author: me,
         text,
         timeAgo: 'now',
         pinned: false,

@@ -25,7 +25,8 @@ import PhotoGrid from '../components/PhotoGrid';
 import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
-import { currentUser, PLAYING_STYLES, AVAILABILITY_OPTIONS } from '../lib/mockData';
+import { PLAYING_STYLES, AVAILABILITY_OPTIONS } from '../lib/mockData';
+import { EMPTY_PROFILE } from '../lib/profile';
 import { SPORTS, SPORT_KEYS, levelDescription } from '../lib/ratings';
 import { colors, fonts, spacing, radius } from '../theme';
 
@@ -38,7 +39,7 @@ const isLocalUri = (u) =>
 
 export default function EditProfileScreen({ navigation }) {
   const { profile, updateProfile, session } = useAuth();
-  const user = profile || currentUser;
+  const user = profile || EMPTY_PROFILE;
   const isCommunity = Boolean(user.isCommunity);
 
   const [scrollEnabled, setScrollEnabled] = useState(true);

@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured, friendlyError } from '../lib/supabase';
 import * as api from '../lib/api';
 import { currentUser as mockUser } from '../lib/mockData';
+import { EMPTY_PROFILE } from '../lib/profile';
 
 const AuthContext = createContext(null);
 
@@ -246,7 +247,11 @@ export function AuthProvider({ children }) {
   // app-wide immediately; persisted to Supabase when live, AsyncStorage in demo.
   async function updateProfile(patch) {
     setProfile((prev) => {
-      const next = { ...(prev || mockUser), ...patch };
+      // Live edits start from a blank shape, never the demo seed user, so a
+      // patch can't drag in someone else's photos/bio. (Only `patch` is sent to
+      // Supabase below — this merge is local UI state.)
+      const base = prev || (isSupabaseConfigured ? EMPTY_PROFILE : mockUser);
+      const next = { ...base, ...patch };
       if (!isSupabaseConfigured) {
         Object.assign(mockUser, patch);
         persistProfile(next);
@@ -263,7 +268,11 @@ export function AuthProvider({ children }) {
   const value = {
     initializing,
     session,
-    profile: profile || (session ? mockUser : null),
+    // Live: expose ONLY the real profile — null while it loads. Handing out the
+    // demo seed user here is what made brand-new accounts appear pre-filled with
+    // someone else's photos, bio and friends. Demo mode (no backend) still backs
+    // a session with the seed user so the app stays explorable.
+    profile: profile || (!isSupabaseConfigured && session ? mockUser : null),
     isAuthenticated: Boolean(session),
     isSupabaseConfigured,
     onboarding,

@@ -1,10 +1,14 @@
 // Central data-access layer.
 //
 // Every screen talks to Supabase through these functions instead of importing
-// mock data directly. Each read tries Supabase first and transparently falls
-// back to local mock data when the backend is unconfigured, unreachable, or
-// (for discovery content like Browse) returns nothing. Writes succeed silently
-// in demo mode and surface real permission/validation errors when live.
+// mock data directly. Writes succeed silently in demo mode and surface real
+// permission/validation errors when live.
+//
+// IMPORTANT — demo data never leaks into a live app. Mock content is returned
+// ONLY when Supabase is unconfigured (`DEMO`), i.e. someone running the app with
+// no .env credentials. When credentials exist we are a real app for real users:
+// a failed or empty read returns nothing, so the UI shows a genuine empty state
+// instead of inventing players, chats, requests or friends.
 //
 // Shapes returned here match what the screens already expect (e.g. a player has
 // `sports: { tennis: { rating, style }, pickleball: { rating, style } }`,
@@ -21,6 +25,15 @@ import {
 } from './supabase';
 import { SPORTS, SPORT_KEYS } from './ratings';
 import * as mock from './mockData';
+
+// Demo mode = no Supabase credentials at all. This is the ONLY situation in
+// which any function here may return mock data.
+const DEMO = !isSupabaseConfigured;
+
+// Mock content for demo mode; an empty result for a real, live app.
+function demoOnly(mockData, empty = []) {
+  return DEMO ? mockData() : empty;
+}
 
 // Forward-geocode a "City, Region" label into { lat, lng }. No permission
 // needed. Returns null if the geocoder is unavailable or finds no match.
@@ -86,21 +99,23 @@ export async function getCurrentUserId() {
   return currentUid();
 }
 
-// Read with mock fallback. `fallbackOnEmpty` is true for discovery content.
+// Read a list. In demo mode this falls back to mock content; in a live app a
+// failed or empty read returns [] so the UI shows a real empty state.
+// `fallbackOnEmpty` only has an effect in demo mode.
 async function readList({ live, mockData, fallbackOnEmpty = false }) {
-  if (!shouldTryLive()) return mockData();
+  if (!shouldTryLive()) return demoOnly(mockData);
   try {
     const { data, error } = await live();
     if (error) {
       if (isNetworkError(error)) markUnreachable();
-      return mockData();
+      return demoOnly(mockData);
     }
     markReachable();
-    if ((!data || data.length === 0) && fallbackOnEmpty) return mockData();
+    if ((!data || data.length === 0) && fallbackOnEmpty) return demoOnly(mockData, data || []);
     return data || [];
   } catch (e) {
     markUnreachable();
-    return mockData();
+    return demoOnly(mockData);
   }
 }
 
@@ -208,7 +223,7 @@ function appSportsToRows(userId, sportsObj = {}) {
 // PROFILES  +  BROWSE
 // ===========================================================================
 export async function getProfile(id) {
-  if (!shouldTryLive()) return mock.getPlayer(id);
+  if (!shouldTryLive()) return demoOnly(() => mock.getPlayer(id), null);
   try {
     const [{ data: row, error }, { data: sportsRows }] = await Promise.all([
       supabase.from('profiles').select(PROFILE_COLS).eq('id', id).single(),
@@ -216,13 +231,13 @@ export async function getProfile(id) {
     ]);
     if (error) {
       if (isNetworkError(error)) markUnreachable();
-      return mock.getPlayer(id);
+      return demoOnly(() => mock.getPlayer(id), null);
     }
     markReachable();
     return dbProfileToApp(row, sportsRows);
   } catch (e) {
     markUnreachable();
-    return mock.getPlayer(id);
+    return demoOnly(() => mock.getPlayer(id), null);
   }
 }
 
@@ -286,7 +301,7 @@ export async function browsePlayers({ sport, lat, lng, radius = 25, min = null, 
       .map((p) => ({ ...p }));
   };
 
-  if (!shouldTryLive()) return mockData();
+  if (!shouldTryLive()) return demoOnly(mockData);
   try {
     const { data, error } = await supabase.rpc('browse_players', {
       in_sport: sport,
@@ -299,7 +314,7 @@ export async function browsePlayers({ sport, lat, lng, radius = 25, min = null, 
     });
     if (error) {
       if (isNetworkError(error)) markUnreachable();
-      return mockData();
+      return demoOnly(mockData);
     }
     markReachable();
     // NOTE: when live + reachable we return the real (PostGIS-filtered) result
@@ -311,7 +326,7 @@ export async function browsePlayers({ sport, lat, lng, radius = 25, min = null, 
     return (data || []).map((row) => browseRowToPlayer(row, sport));
   } catch (e) {
     markUnreachable();
-    return mockData();
+    return demoOnly(mockData);
   }
 }
 
@@ -551,7 +566,7 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
       .filter((p) => p.sport === sport && p.distance <= maxDistance)
       .map((p) => ({ ...p }));
 
-  if (!shouldTryLive()) return mockData();
+  if (!shouldTryLive()) return demoOnly(mockData);
   try {
     const { data, error } = await supabase
       .from('court_posts')
@@ -561,7 +576,7 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
       .limit(100);
     if (error) {
       if (isNetworkError(error)) markUnreachable();
-      return mockData();
+      return demoOnly(mockData);
     }
     markReachable();
 
@@ -592,7 +607,7 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
     return posts.filter((p) => p.distance != null && p.distance <= maxDistance);
   } catch (e) {
     markUnreachable();
-    return mockData();
+    return demoOnly(mockData);
   }
 }
 
@@ -683,7 +698,8 @@ export async function getCommunities(sport) {
 }
 
 export async function getCommunity(id) {
-  if (!shouldTryLive()) return mock.communities.find((c) => c.id === id) || null;
+  const mockCommunity = () => mock.communities.find((c) => c.id === id) || null;
+  if (!shouldTryLive()) return demoOnly(mockCommunity, null);
   try {
     const uid = await currentUid();
     const [{ data: c, error }, { data: posts }, { data: mem }] = await Promise.all([
@@ -698,7 +714,7 @@ export async function getCommunity(id) {
     ]);
     if (error) {
       if (isNetworkError(error)) markUnreachable();
-      return mock.communities.find((x) => x.id === id) || null;
+      return demoOnly(mockCommunity, null);
     }
     markReachable();
     const members = (mem || []).map((m) => m.user_id);
@@ -728,21 +744,22 @@ export async function getCommunity(id) {
     };
   } catch (e) {
     markUnreachable();
-    return mock.communities.find((x) => x.id === id) || null;
+    return demoOnly(mockCommunity, null);
   }
 }
 
-// Communities the current user belongs to (for My Profile).
-export async function getMyCommunities() {
+// Communities a given user belongs to. Used for My Profile (own id) and for
+// another player's profile.
+export async function getCommunitiesForUser(userId) {
+  if (!userId) return [];
   return readList({
     fallbackOnEmpty: false,
-    mockData: () => mock.getCommunitiesForPlayer('me').map((c) => ({ ...c })),
+    mockData: () => mock.getCommunitiesForPlayer(userId).map((c) => ({ ...c })),
     live: async () => {
-      const uid = await currentUid();
       const { data, error } = await supabase
         .from('community_members')
         .select('communities(*)')
-        .eq('user_id', uid);
+        .eq('user_id', userId);
       if (error) return { data, error };
       return {
         data: (data || [])
@@ -761,6 +778,12 @@ export async function getMyCommunities() {
       };
     },
   });
+}
+
+// Communities the current user belongs to (for My Profile).
+export async function getMyCommunities() {
+  const uid = await currentUid();
+  return getCommunitiesForUser(uid || (DEMO ? 'me' : null));
 }
 
 export async function joinCommunity(id) {
@@ -999,6 +1022,8 @@ export default {
   getCurrentUserId,
   getCommunities,
   getCommunity,
+  getCommunitiesForUser,
+  getMyCommunities,
   joinCommunity,
   leaveCommunity,
   createCommunityPost,

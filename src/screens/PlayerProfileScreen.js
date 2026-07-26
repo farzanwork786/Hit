@@ -1,6 +1,6 @@
 // Full-screen player profile with cover, per-sport ratings, bio, friends,
 // gallery and actions.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -21,15 +21,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppButton, Tag } from '../components/ui';
 import SportIcon, { SportChip } from '../components/SportIcon';
 import { SPORTS, SPORT_KEYS, playsSport, ratingShort } from '../lib/ratings';
-import {
-  getFriends,
-  canSeeFriends,
-  getCommunitiesForPlayer,
-  canSeeCommunities,
-} from '../lib/mockData';
+import { canSeeFriends, canSeeCommunities } from '../lib/profile';
 import * as api from '../lib/api';
 import { notifyMatchRequest } from '../lib/notifications';
 import { useSport } from '../context/SportContext';
+import { useAuth } from '../context/AuthContext';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -47,11 +43,33 @@ const REPORT_REASONS = [
 export default function PlayerProfileScreen({ route, navigation }) {
   const { player } = route.params;
   const { sport } = useSport();
+  const { session } = useAuth();
+  const viewerId = session?.user?.id ?? null;
   const sports = SPORT_KEYS.filter((s) => playsSport(player, s));
-  const friendsVisible = canSeeFriends(player);
-  const friends = friendsVisible ? getFriends(player) : [];
-  const communitiesVisible = canSeeCommunities(player);
-  const communities = communitiesVisible ? getCommunitiesForPlayer(player.id) : [];
+  const friendsVisible = canSeeFriends(player, viewerId);
+  const communitiesVisible = canSeeCommunities(player, viewerId);
+
+  // Friends and communities come from the backend — never from demo data, so a
+  // real profile can't show invented connections.
+  const [friends, setFriends] = useState([]);
+  const [communities, setCommunities] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const [f, c] = await Promise.all([
+        friendsVisible ? api.getFriends(player.id) : Promise.resolve([]),
+        communitiesVisible ? api.getCommunitiesForUser(player.id) : Promise.resolve([]),
+      ]);
+      if (active) {
+        setFriends(f || []);
+        setCommunities(c || []);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [player.id, friendsVisible, communitiesVisible]);
 
   const [menuOpen, setMenuOpen] = useState(false);
   // 0 = main options, 1 = pick reason, 2 = submitted
