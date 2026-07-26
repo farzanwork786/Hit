@@ -22,6 +22,7 @@ import { Tag, IconButton, EmptyState, Field, AppButton, KeyboardDoneBar } from '
 import SportToggle from '../components/SportToggle';
 import SportIcon from '../components/SportIcon';
 import CityField from '../components/CityField';
+import { LocationChip, LocationPickerModal } from '../components/LocationPicker';
 import { POST_LEVELS } from '../lib/mockData';
 import { EMPTY_PROFILE } from '../lib/profile';
 import * as api from '../lib/api';
@@ -47,6 +48,7 @@ export default function CourtBoardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [locOpen, setLocOpen] = useState(false);
   const [editingPost, setEditingPost] = useState(null); // post being edited (or null)
   const [menuPost, setMenuPost] = useState(null); // post whose ⋯ menu is open
 
@@ -185,6 +187,9 @@ export default function CourtBoardScreen({ navigation }) {
 
       <View style={styles.toggleRow}>
         <SportToggle />
+        {/* Same active location as Browse — shown here so it's clear which
+            place the distance filter below is measuring from. */}
+        <LocationChip onPress={() => setLocOpen(true)} style={{ marginTop: spacing.sm }} />
       </View>
 
       {/* Distance filter chips */}
@@ -270,6 +275,8 @@ export default function CourtBoardScreen({ navigation }) {
         onEdit={openEdit}
         onDelete={confirmDelete}
       />
+
+      <LocationPickerModal visible={locOpen} onClose={() => setLocOpen(false)} />
     </SafeAreaView>
   );
 }

@@ -1,6 +1,7 @@
 // Communities — clubs, parks and groups. "My Communities" plus nearby ones to
 // discover, filtered by the app-wide sport toggle.
 import React, { useCallback, useState } from 'react';
+
 import { View, Text, StyleSheet, FlatList, Pressable, Share, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,31 +11,39 @@ import { Ionicons } from '@expo/vector-icons';
 
 import SportToggle from '../components/SportToggle';
 import SportIcon from '../components/SportIcon';
+import { LocationChip, LocationPickerModal } from '../components/LocationPicker';
 import { EmptyState } from '../components/ui';
 import * as api from '../lib/api';
 import { SPORTS } from '../lib/ratings';
 import { useSport } from '../context/SportContext';
+import { useLocation } from '../context/LocationContext';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
 export default function CommunitiesScreen({ navigation }) {
   const { sport } = useSport();
+  const { activeCoords } = useLocation();
   const [visible, setVisible] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [locOpen, setLocOpen] = useState(false);
 
   // Reload on focus so joins/leaves made on the detail screen are reflected.
+  // Also re-runs when the active location changes so distances stay correct.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
         setLoading(true);
-        const data = await api.getCommunities(sport);
+        const data = await api.getCommunities(sport, {
+          lat: activeCoords?.lat ?? null,
+          lng: activeCoords?.lng ?? null,
+        });
         if (active) {
           setVisible(data);
           setLoading(false);
         }
       })();
       return () => { active = false; };
-    }, [sport])
+    }, [sport, activeCoords])
   );
 
   const mine = visible.filter((c) => c.joined);
@@ -43,7 +52,7 @@ export default function CommunitiesScreen({ navigation }) {
   const sections = [
     ...(mine.length ? [{ type: 'header', id: 'h-mine', title: 'My Communities' }] : []),
     ...mine.map((c) => ({ type: 'community', id: c.id, community: c })),
-    ...(nearby.length ? [{ type: 'header', id: 'h-near', title: 'Discover nearby' }] : []),
+    ...(nearby.length ? [{ type: 'header', id: 'h-near', title: 'Discover' }] : []),
     ...nearby.map((c) => ({ type: 'community', id: c.id, community: c })),
   ];
 
@@ -58,6 +67,7 @@ export default function CommunitiesScreen({ navigation }) {
 
       <View style={styles.toggleRow}>
         <SportToggle />
+        <LocationChip onPress={() => setLocOpen(true)} style={{ marginTop: spacing.sm }} />
       </View>
 
       <FlatList
@@ -100,6 +110,8 @@ export default function CommunitiesScreen({ navigation }) {
           )
         }
       />
+
+      <LocationPickerModal visible={locOpen} onClose={() => setLocOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -128,7 +140,13 @@ function CommunityCard({ community, onPress }) {
           <View style={styles.metaRow}>
             <Ionicons name="location" size={12} color="rgba(255,255,255,0.85)" />
             <Text style={styles.meta}>
-              {community.city} · {community.distance} mi · {community.memberCount} members
+              {[
+                community.city,
+                community.distance != null ? `${community.distance} mi` : null,
+                `${community.memberCount} members`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
           </View>
         </View>

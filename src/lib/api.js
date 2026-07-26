@@ -656,10 +656,27 @@ export async function deleteCourtPost(id) {
 // ===========================================================================
 // COMMUNITIES
 // ===========================================================================
-export async function getCommunities(sport) {
+// Communities for a sport. `lat`/`lng` (the active Browse location) are used to
+// show a real distance and to order nearest-first — results are NOT filtered by
+// distance, so a community is never hidden just for being far away.
+export async function getCommunities(sport, { lat = null, lng = null } = {}) {
+  const origin = lat != null && lng != null ? { lat, lng } : null;
+
+  // Nearest first when we know where the user is; otherwise biggest first.
+  const sortByDistance = (list) =>
+    origin
+      ? [...list].sort((a, b) => {
+          if (a.distance == null && b.distance == null) return 0;
+          if (a.distance == null) return 1; // unknown location sinks to the end
+          if (b.distance == null) return -1;
+          return a.distance - b.distance;
+        })
+      : list;
+
   return readList({
     fallbackOnEmpty: true,
-    mockData: () => mock.communities.filter((c) => c.sports.includes(sport)).map((c) => ({ ...c })),
+    mockData: () =>
+      sortByDistance(mock.communities.filter((c) => c.sports.includes(sport)).map((c) => ({ ...c }))),
     live: async () => {
       const uid = await currentUid();
       const { data, error } = await supabase
@@ -679,20 +696,24 @@ export async function getCommunities(sport) {
           .in('community_id', ids);
         joinedSet = new Set((mem || []).map((m) => m.community_id));
       }
-      return {
-        data: (data || []).map((c) => ({
+      const list = (data || []).map((c) => {
+        // null when we don't know the user's or the community's location —
+        // the card then omits the distance rather than claiming "0 mi".
+        const dist = origin ? milesBetween(origin, { lat: c.lat, lng: c.lng }) : null;
+        return {
           id: c.id,
           name: c.name,
           photo: c.photo,
           cover: c.cover,
           description: c.description,
           city: c.city,
-          distance: 0,
+          distance: dist != null ? Math.round(dist * 10) / 10 : null,
           sports: c.sports || [],
           memberCount: c.member_count || 0,
           joined: joinedSet.has(c.id),
-        })),
-      };
+        };
+      });
+      return { data: sortByDistance(list) };
     },
   });
 }
