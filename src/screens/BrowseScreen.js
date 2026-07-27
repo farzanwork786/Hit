@@ -1,5 +1,5 @@
 // Browse players — list of nearby players for the selected sport with a
-// collapsible filter panel (location, distance, rating range, playing style).
+// collapsible filter panel (location, distance, rating range).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -24,7 +24,8 @@ import SportToggle from '../components/SportToggle';
 import { LevelGuideModal } from '../components/RatingSelector';
 import { LocationChip, LocationPickerModal } from '../components/LocationPicker';
 import { IconButton, EmptyState } from '../components/ui';
-import { PLAYING_STYLES, isBlocked } from '../lib/mockData';
+import { isBlocked } from '../lib/mockData';
+import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import * as api from '../lib/api';
 import { SPORTS, filterRangesFor, matchesRange } from '../lib/ratings';
 import { useSport } from '../context/SportContext';
@@ -35,7 +36,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const DEFAULT_FILTERS = { distance: 25, rangeId: 'all', style: null };
+const DEFAULT_FILTERS = { distance: 25, rangeId: 'all' };
 
 export default function BrowseScreen({ navigation }) {
   const { sport } = useSport();
@@ -86,7 +87,7 @@ export default function BrowseScreen({ navigation }) {
 
   // Reset sport-specific filters when switching sport.
   useEffect(() => {
-    setFilters((f) => ({ ...f, rangeId: 'all', style: null }));
+    setFilters((f) => ({ ...f, rangeId: 'all' }));
   }, [sport]);
 
   function toggle() {
@@ -102,14 +103,12 @@ export default function BrowseScreen({ navigation }) {
       if (isBlocked(p.id)) return false;
       const rv = p.sports?.[sport]?.[SPORTS[sport].ratingKey] ?? null;
       if (range?.nrOnly && rv !== null) return false;
-      if (filters.style && p.sports?.[sport]?.style !== filters.style) return false;
       return true;
     });
-  }, [rawPlayers, filters.style, filters.rangeId, sport]);
+  }, [rawPlayers, filters.rangeId, sport]);
 
   const activeCount =
     (filters.distance !== DEFAULT_FILTERS.distance ? 1 : 0) +
-    (filters.style ? 1 : 0) +
     (filters.rangeId !== 'all' ? 1 : 0);
 
   return (
@@ -216,8 +215,11 @@ export default function BrowseScreen({ navigation }) {
               action="Invite a friend"
               onAction={() =>
                 Share.share({
-                  message: "I'm on Hit — the app for finding tennis & pickleball players nearby. Come join me!",
+                  message: withAppLink(
+                    "I'm on Hit — the app for finding tennis & pickleball players nearby. Come join me!"
+                  ),
                   title: 'Hit app',
+                  url: APP_STORE_URL,
                 })
               }
             />
@@ -271,14 +273,6 @@ function FilterPanel({ sport, filters, setFilters, onReset, onClose, onOpenGuide
               active={filters.rangeId === r.id}
               onPress={() => set({ rangeId: r.id })}
             />
-          ))}
-        </View>
-
-        <Text style={[styles.filterLabel, { marginTop: spacing.md }]}>Playing style</Text>
-        <View style={styles.chipWrap}>
-          <FilterChip label="Any" active={!filters.style} onPress={() => set({ style: null })} />
-          {PLAYING_STYLES[sport].map((s) => (
-            <FilterChip key={s} label={s} active={filters.style === s} onPress={() => set({ style: s })} />
           ))}
         </View>
       </ScrollView>

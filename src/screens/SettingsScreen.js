@@ -101,7 +101,6 @@ export default function SettingsScreen({ navigation }) {
         items: [
           { type: 'nav', icon: 'tennisball-outline', label: 'Sports', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'sport tennis pickleball add remove' },
           { type: 'nav', icon: 'stats-chart-outline', label: 'Skill Level', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'skill level rating' },
-          { type: 'nav', icon: 'options-outline', label: 'Playing style', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'playing style' },
           { type: 'nav', icon: 'calendar-outline', label: 'Availability', value: 'Edit', onPress: () => navigation.navigate('EditProfile'), kw: 'availability when play schedule' },
         ],
       },

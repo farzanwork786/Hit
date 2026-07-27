@@ -23,6 +23,13 @@ expo-env.d.ts
 metro*.log
 metro*.err
 
+# EAS build/submit run logs
+eas-build.log
+eas-submit.log
+
+# Unprocessed source art kept locally while preparing an icon/asset
+assets/*-source.png
+
 # debug
 npm-debug.*
 yarn-debug.*

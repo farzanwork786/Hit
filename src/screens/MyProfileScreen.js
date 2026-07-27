@@ -15,6 +15,7 @@ import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
 import { EMPTY_PROFILE } from '../lib/profile';
+import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import { SPORTS, SPORT_KEYS, playsSport, ratingShort } from '../lib/ratings';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
@@ -72,9 +73,11 @@ export default function MyProfileScreen({ navigation }) {
   }
 
   function shareProfile() {
+    const name = user.name || 'me';
     Share.share({
-      message: `Find me on Hit — ${user.name}${user.city ? ` · ${user.city}` : ''}`,
+      message: withAppLink(`Find me on Hit — ${name}${user.city ? ` · ${user.city}` : ''}`),
       title: 'My Hit profile',
+      url: APP_STORE_URL, // iOS-only: attaches a proper link preview card
     });
   }
 
@@ -147,11 +150,6 @@ export default function MyProfileScreen({ navigation }) {
                   <SportIcon sport={s} size={12} color={colors.slate500} />
                   <Text style={styles.statLabel}>Skill Level</Text>
                 </View>
-                {user.sports?.[s]?.style ? (
-                  <Text style={styles.statStyle} numberOfLines={1}>
-                    {user.sports[s].style}
-                  </Text>
-                ) : null}
               </View>
             ))}
           </View>

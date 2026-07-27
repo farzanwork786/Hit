@@ -22,6 +22,7 @@ import { AppButton, Tag } from '../components/ui';
 import SportIcon, { SportChip } from '../components/SportIcon';
 import { SPORTS, SPORT_KEYS, playsSport, ratingShort } from '../lib/ratings';
 import { canSeeFriends, canSeeCommunities } from '../lib/profile';
+import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import * as api from '../lib/api';
 import { notifyMatchRequest } from '../lib/notifications';
 import { useSport } from '../context/SportContext';
@@ -111,9 +112,13 @@ export default function PlayerProfileScreen({ route, navigation }) {
 
   function handleShare() {
     closeMenu();
+    const locationBit = [player.city, player.distance != null ? `${player.distance} mi away` : null]
+      .filter(Boolean)
+      .join(' · ');
     Share.share({
-      message: `Check out ${player.name}'s profile on Hit — ${player.city} · ${player.distance} mi away`,
+      message: withAppLink(`Check out ${player.name}'s profile on Hit${locationBit ? ` — ${locationBit}` : ''}`),
       title: `${player.name} on Hit`,
+      url: APP_STORE_URL,
     });
   }
 
@@ -182,7 +187,6 @@ export default function PlayerProfileScreen({ route, navigation }) {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.sportName}>{meta.label}</Text>
-                    {entry.style ? <Text style={styles.sportStyle}>{entry.style}</Text> : null}
                   </View>
                   <View style={styles.ratingBox}>
                     <Text style={styles.ratingValue}>{ratingShort(player, s) ?? 'Not set'}</Text>

@@ -21,7 +21,6 @@ import RatingSelector, { LevelGuideModal } from '../components/RatingSelector';
 import CityField from '../components/CityField';
 import SportIcon from '../components/SportIcon';
 import { useAuth } from '../context/AuthContext';
-import { REG_STYLES } from '../lib/mockData';
 import { SPORTS, SPORT_KEYS } from '../lib/ratings';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
@@ -33,7 +32,7 @@ const COMMUNITY_PHOTOS = [
   'https://images.unsplash.com/photo-1530915365347-e35b749a0381?w=900&q=80',
 ];
 
-const emptySport = (sport) => ({ rating: null, style: REG_STYLES[sport][0] });
+const emptySport = () => ({ rating: null });
 
 // Resolve a sport's wizard selections into the stored shape.
 function resolveSports(formSports) {
@@ -46,7 +45,7 @@ function resolveSports(formSports) {
     if (value != null) {
       value = Math.round(Math.min(Math.max(value, meta.min), meta.max) * 10) / 10;
     }
-    out[s] = { rating: value, style: sp.style };
+    out[s] = { rating: value };
   }
   return out;
 }
@@ -431,13 +430,6 @@ function SportLevelBlock({ sport, sp, setSportField, error, onOpenGuide }) {
       />
 
       {error ? <Text style={styles.submitError}>{error}</Text> : null}
-
-      <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Playing style</Text>
-      <View style={styles.chipWrap}>
-        {REG_STYLES[sport].map((s) => (
-          <Chip key={s} label={s} active={sp.style === s} onPress={() => setSportField({ style: s })} />
-        ))}
-      </View>
     </View>
   );
 }

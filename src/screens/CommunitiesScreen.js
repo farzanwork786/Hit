@@ -16,6 +16,7 @@ import { EmptyState } from '../components/ui';
 import * as api from '../lib/api';
 import { SPORTS } from '../lib/ratings';
 import { useSport } from '../context/SportContext';
+import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import { useLocation } from '../context/LocationContext';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
@@ -102,8 +103,11 @@ export default function CommunitiesScreen({ navigation }) {
             action="Tell your club about Hit"
             onAction={() =>
               Share.share({
-                message: "My club should be on Hit — the app for finding tennis & pickleball players. Check it out!",
+                message: withAppLink(
+                  "My club should be on Hit — the app for finding tennis & pickleball players. Check it out!"
+                ),
                 title: 'Hit app',
+                url: APP_STORE_URL,
               })
             }
           />

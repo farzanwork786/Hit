@@ -25,7 +25,7 @@ import PhotoGrid from '../components/PhotoGrid';
 import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
-import { PLAYING_STYLES, AVAILABILITY_OPTIONS } from '../lib/mockData';
+import { AVAILABILITY_OPTIONS } from '../lib/mockData';
 import { EMPTY_PROFILE } from '../lib/profile';
 import { SPORTS, SPORT_KEYS, levelDescription } from '../lib/ratings';
 import { colors, fonts, spacing, radius } from '../theme';
@@ -72,7 +72,7 @@ export default function EditProfileScreen({ navigation }) {
     } else {
       const next = { ...form.sports };
       if (next[s]) delete next[s];
-      else next[s] = { rating: null, style: PLAYING_STYLES[s][0] };
+      else next[s] = { rating: null };
       set({ sports: next });
     }
   }
@@ -258,18 +258,6 @@ export default function EditProfileScreen({ navigation }) {
                       </View>
                       <Ionicons name="chevron-forward" size={18} color={colors.slate400} />
                     </Pressable>
-
-                    <Text style={styles.subLabel}>Playing style</Text>
-                    <View style={styles.chipWrap}>
-                      {PLAYING_STYLES[s].map((st) => (
-                        <Chip
-                          key={st}
-                          label={st}
-                          active={form.sports[s].style === st}
-                          onPress={() => setSportField(s, { style: st })}
-                        />
-                      ))}
-                    </View>
                   </View>
                 ) : null}
               </View>

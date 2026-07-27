@@ -24,6 +24,7 @@ import { notifyMessage } from '../lib/notifications';
 import { KeyboardDoneBar, DONE_BAR_ID } from '../components/ui';
 import { RatingSummary } from '../components/SportIcon';
 import { useSport } from '../context/SportContext';
+import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import { colors, fonts, spacing, radius } from '../theme';
 
 export default function ChatDetailScreen({ route, navigation }) {
@@ -77,8 +78,9 @@ export default function ChatDetailScreen({ route, navigation }) {
   function handleShare() {
     closeMenu();
     Share.share({
-      message: `Check out ${player.name}'s profile on Hit`,
+      message: withAppLink(`Check out ${player.name}'s profile on Hit`),
       title: `${player.name} on Hit`,
+      url: APP_STORE_URL,
     });
   }
 

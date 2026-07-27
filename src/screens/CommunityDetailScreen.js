@@ -25,6 +25,7 @@ import { SportChip } from '../components/SportIcon';
 import { getPlayer } from '../lib/mockData';
 import { EMPTY_PROFILE } from '../lib/profile';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import * as api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
@@ -248,8 +249,11 @@ export default function CommunityDetailScreen({ route, navigation }) {
               onPress={() => {
                 setMenuOpen(false);
                 Share.share({
-                  message: `Check out ${community.name} on Hit — ${community.city} · ${community.memberCount} members`,
+                  message: withAppLink(
+                    `Check out ${community.name} on Hit — ${community.city} · ${community.memberCount} members`
+                  ),
                   title: `${community.name} on Hit`,
+                  url: APP_STORE_URL,
                 });
               }}
             />

@@ -5,14 +5,12 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Tag } from './ui';
 import SportIcon from './SportIcon';
 import { SPORTS, ratingShort } from '../lib/ratings';
 import { colors, fonts, radius, spacing, shadow } from '../theme';
 
 export default function PlayerCard({ player, sport = 'tennis', onPress }) {
   const meta = SPORTS[sport];
-  const style = player.sports?.[sport]?.style;
   const level = ratingShort(player, sport); // null when skill level not set
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.96 }]}>
@@ -65,9 +63,6 @@ export default function PlayerCard({ player, sport = 'tennis', onPress }) {
         {level != null ? (
           <Text style={styles.ratingDisclaimer}>Self-reported skill level</Text>
         ) : null}
-        <View style={styles.tagRow}>
-          {style ? <Tag label={style} tone="blue" icon="tennisball" /> : null}
-        </View>
         <Text numberOfLines={2} style={styles.bio}>
           {player.bio}
         </Text>
