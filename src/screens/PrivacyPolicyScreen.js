@@ -114,7 +114,7 @@ export default function PrivacyPolicyScreen({ navigation }) {
 
         <S title="12. Contact">
           Questions or requests about your data? Reach us at:{'\n'}
-          <B>privacy@hit.app</B>
+          <B>farzanwork786@gmail.com</B>
         </S>
       </ScrollView>
     </SafeAreaView>

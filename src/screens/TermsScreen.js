@@ -126,7 +126,7 @@ export default function TermsScreen({ navigation }) {
 
         <S title="11. Contact">
           Questions about these Terms? Contact us at:{'\n'}
-          <B>legal@hit.app</B>
+          <B>farzanwork786@gmail.com</B>
         </S>
       </ScrollView>
     </SafeAreaView>
