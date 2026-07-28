@@ -30,8 +30,12 @@ export default function PrivacyPolicyScreen({ navigation }) {
           <B>Sports & skill data</B> — the sports you play and self-reported skill
           estimates you enter. These are not verified or shared with any rating
           organisation.{'\n\n'}
-          <B>Location</B> — your chosen home city. We use this to show nearby players.
-          We do not collect or store GPS coordinates.{'\n\n'}
+          <B>Location</B> — your chosen home city, and, if you grant permission, your
+          device's precise GPS coordinates. We use this only to calculate your
+          approximate distance from other players and communities. We never show
+          your exact coordinates or address to other users — only a rounded distance
+          (e.g. "3.2 mi away"). You can deny location permission at any time and Hit
+          will use your chosen city instead.{'\n\n'}
           <B>Usage data</B> — features used, screens visited, and in-app interactions,
           used to improve the app.{'\n\n'}
           <B>Device data</B> — device type, OS version, and push notification token
@@ -66,8 +70,10 @@ export default function PrivacyPolicyScreen({ navigation }) {
         </S>
 
         <S title="5. Location & Distance">
-          Distance shown to other users is based on your chosen home city, not live GPS.
-          Your exact address is never shown to other users or stored by Hit.
+          Distance shown to other users is calculated from your device's GPS location
+          (when you grant permission) or your chosen home city (if you don't). Your
+          exact coordinates and home address are never shown to other users or stored
+          anywhere other users can access — only an approximate distance.
         </S>
 
         <S title="6. Your Rights & Choices">
