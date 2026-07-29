@@ -52,9 +52,22 @@ export default function MessagesScreen({ navigation }) {
 
   // Untagged threads/requests (sport === null) show under both sports.
   const matchesSport = (item) => !item.sport || item.sport === sport;
-  const visibleChats = chats.filter((c) => c.player && !isBlocked(c.player.id) && matchesSport(c));
   const visibleRequests = pendingRequests.filter(
     (r) => r.player && !isBlocked(r.player.id) && matchesSport(r)
+  );
+
+  // Someone with a still-pending request to you belongs in Requests only — not
+  // in both tabs at once. Once you accept or reply, the request is no longer
+  // pending and their thread appears here.
+  const pendingFromIds = new Set(
+    pendingRequests.filter((r) => r.player).map((r) => r.player.id)
+  );
+  const visibleChats = chats.filter(
+    (c) =>
+      c.player &&
+      !isBlocked(c.player.id) &&
+      matchesSport(c) &&
+      !pendingFromIds.has(c.player.id)
   );
 
   return (

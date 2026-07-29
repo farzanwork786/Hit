@@ -1,5 +1,5 @@
-// City/location input with live autocomplete. Uses Google Places when an API
-// key is configured, otherwise a large offline list (see lib/places.js).
+// City/location input with live autocomplete (see lib/places.js for the search
+// sources — offline list plus the device geocoder, so small towns resolve too).
 // Prevents spelling errors so same-city players actually connect.
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -79,7 +79,9 @@ export default function CityField({ value, onChange, onSelect, label = 'City', e
                   setPicked(true);
                   setResults([]);
                   onChange(r.label);
-                  onSelect?.(r.label);
+                  // Pass coords when the search already resolved them, so the
+                  // caller doesn't have to geocode the label a second time.
+                  onSelect?.(r.label, r.coords ?? null);
                 }}
                 style={({ pressed }) => [
                   styles.item,

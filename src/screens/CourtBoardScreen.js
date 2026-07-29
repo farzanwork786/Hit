@@ -135,6 +135,13 @@ export default function CourtBoardScreen({ navigation }) {
       lat: activeCoords?.lat ?? null,
       lng: activeCoords?.lng ?? null,
     });
+    if (res && res.ok === false) {
+      // Roll the optimistic post back so the feed matches reality, and say so
+      // rather than letting the post quietly vanish on the next refresh.
+      setPosts((prev) => prev.filter((p) => p.id !== tempId));
+      Alert.alert('Could not post', 'Your post was not saved. Please try again.');
+      return;
+    }
     // When live, pull the canonical row (real id, server ordering) so the post
     // persists correctly across refreshes.
     if (res && res.ok && !res.demo) {
@@ -223,12 +230,18 @@ export default function CourtBoardScreen({ navigation }) {
               onReply={async () => {
                 if (!item.author || isMine) return;
                 notifyCourtBoardReply(me);
-                const conv = await api.getOrCreateConversation(item.author.id, item.sport || sport);
+                // First contact goes through the same request gate as Browse:
+                // the conversation is created lazily on the first message.
+                const postSport = item.sport || sport;
+                await api.sendMatchRequest(
+                  item.author.id,
+                  `Hi! Replying to your Court Board post${item.court ? ` at ${item.court}` : ''}.`,
+                  postSport
+                );
                 navigation.navigate('ChatDetail', {
                   player: item.author,
-                  chatId: conv?.id || undefined,
-                  isRequest: !conv?.id,
-                  sport: item.sport || sport,
+                  isRequest: true,
+                  sport: postSport,
                 });
               }}
             />

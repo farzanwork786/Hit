@@ -42,10 +42,31 @@ const REPORT_REASONS = [
 ];
 
 export default function PlayerProfileScreen({ route, navigation }) {
-  const { player } = route.params;
+  const { player: routePlayer } = route.params;
   const { sport } = useSport();
   const { session } = useAuth();
   const viewerId = session?.user?.id ?? null;
+
+  // Lists elsewhere in the app (Messages, Requests, Friends, Court Board
+  // authors) build a player from the profiles row alone, without the per-sport
+  // rows — so Skill Level would be missing here. Re-fetch the full profile and
+  // merge it over what we were handed, keeping the passed-in data visible
+  // immediately so the screen never flashes empty.
+  const [full, setFull] = useState(null);
+  const player = full ? { ...routePlayer, ...full } : routePlayer;
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!routePlayer?.id) return;
+      const fresh = await api.getProfile(routePlayer.id);
+      if (active && fresh) setFull(fresh);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [routePlayer?.id]);
+
   const sports = SPORT_KEYS.filter((s) => playsSport(player, s));
   const friendsVisible = canSeeFriends(player, viewerId);
   const communitiesVisible = canSeeCommunities(player, viewerId);
@@ -76,7 +97,6 @@ export default function PlayerProfileScreen({ route, navigation }) {
   // 0 = main options, 1 = pick reason, 2 = submitted
   const [reportStep, setReportStep] = useState(0);
   const [reportReason, setReportReason] = useState(null);
-  const [liked, setLiked] = useState(false);
 
   function openMenu() {
     setReportStep(0);
@@ -132,11 +152,14 @@ export default function PlayerProfileScreen({ route, navigation }) {
   async function sendRequest() {
     notifyMatchRequest({ id: player.id, name: 'You' });
     await api.sendMatchRequest(player.id, `Hey ${player.name.split(' ')[0]}! Want to hit sometime?`, sport);
-    const conv = await api.getOrCreateConversation(player.id, sport);
+    // Deliberately do NOT create a conversation here. It's created lazily when
+    // the first message is actually sent, so the recipient sees this as a single
+    // play request (Requests tab) rather than appearing in both Requests and
+    // Chats at once.
     navigation.navigate('ChatDetail', {
       player,
-      chatId: conv?.id || undefined,
-      isRequest: !conv?.id,
+      isRequest: true,
+      sport,
     });
   }
 
@@ -309,12 +332,6 @@ export default function PlayerProfileScreen({ route, navigation }) {
             onPress={sendRequest}
           />
         </View>
-        <Pressable
-          style={[styles.likeBtn, liked && { backgroundColor: colors.red }]}
-          onPress={() => setLiked((v) => !v)}
-        >
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={colors.white} />
-        </Pressable>
       </SafeAreaView>
 
       {/* ⋯ Options sheet */}
@@ -493,14 +510,6 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  likeBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.navy,
     alignItems: 'center',
     justifyContent: 'center',
   },

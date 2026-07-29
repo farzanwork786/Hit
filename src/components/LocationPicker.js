@@ -49,8 +49,8 @@ export function LocationPickerModal({ visible, onClose }) {
   } = useLocation();
   const [query, setQuery] = useState('');
 
-  function choose(label) {
-    setActiveLocation(label);
+  function choose(label, coords = null) {
+    setActiveLocation(label, coords);
     setQuery('');
     onClose();
   }

@@ -37,6 +37,7 @@ export default function ChatDetailScreen({ route, navigation }) {
   const [text, setText] = useState('');
   const listRef = useRef(null);
   const myUidRef = useRef(null);
+  const promotedRef = useRef(false); // guards the request→chat promotion
 
   // Resolve the signed-in user's id once so realtime inserts can be attributed
   // to the correct side (mine = right, theirs = left).
@@ -162,6 +163,14 @@ export default function ChatDetailScreen({ route, navigation }) {
       }
     }
     if (cid) await api.sendMessage(cid, body);
+
+    // Replying counts as accepting: if this person had a pending request out to
+    // us, promote it so the thread moves from Requests into Chats. Runs once
+    // per screen visit; harmless no-op when there's nothing pending.
+    if (!promotedRef.current) {
+      promotedRef.current = true;
+      api.acceptRequestFrom(player.id);
+    }
   }
 
   return (

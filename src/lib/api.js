@@ -375,6 +375,22 @@ export async function getIncomingRequests() {
 export async function acceptRequest(id) {
   return write(() => supabase.from('match_requests').update({ status: 'accepted' }).eq('id', id));
 }
+
+// Promote any pending request FROM `fromUserId` to me. Replying to someone is
+// an implicit accept, so their thread moves out of Requests and into Chats.
+// A no-op when there's no pending request.
+export async function acceptRequestFrom(fromUserId) {
+  if (!fromUserId) return { ok: true };
+  return write(async () => {
+    const uid = await currentUid();
+    return supabase
+      .from('match_requests')
+      .update({ status: 'accepted' })
+      .eq('from_user', fromUserId)
+      .eq('to_user', uid)
+      .eq('status', 'pending');
+  });
+}
 export async function declineRequest(id) {
   return write(() => supabase.from('match_requests').update({ status: 'declined' }).eq('id', id));
 }
@@ -560,6 +576,7 @@ export function subscribeMessages(conversationId, onInsert) {
 // ===========================================================================
 export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance = 50 }) {
   const origin = lat != null && lng != null ? { lat, lng } : null;
+  const uid = await currentUid();
 
   const mockData = () =>
     mock.courtPosts
@@ -586,6 +603,7 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
       return {
         id: p.id,
         sport: p.sport,
+        authorId: p.author_id,
         author: dbProfileToApp(p.author, []),
         court: p.court,
         city: p.city,
@@ -599,12 +617,18 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
       };
     });
 
-    // Strict radius when we have an origin: only posts with a known location
-    // within `maxDistance`. Without an origin we can't filter, so show all.
-    // (Like browsePlayers, when live + reachable we return the real result
-    // as-is — even when empty — rather than leaking far-away demo posts.)
+    // Distance filter. Unlike browsePlayers we do NOT drop posts with an
+    // unknown location: a post whose author had no resolved coordinates would
+    // otherwise be invisible to everyone (including its own author) forever.
+    // Better to show it without a distance than to silently swallow it.
+    // Your own posts always show, however far away you've since moved.
     if (!origin) return posts;
-    return posts.filter((p) => p.distance != null && p.distance <= maxDistance);
+    return posts.filter(
+      (p) =>
+        (uid && p.authorId === uid) ||
+        p.distance == null ||
+        p.distance <= maxDistance
+    );
   } catch (e) {
     markUnreachable();
     return demoOnly(mockData);
@@ -1028,6 +1052,7 @@ export default {
   sendMatchRequest,
   getIncomingRequests,
   acceptRequest,
+  acceptRequestFrom,
   declineRequest,
   getFriends,
   getConversations,
