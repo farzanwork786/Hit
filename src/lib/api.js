@@ -50,6 +50,14 @@ async function geocodeLabel(label) {
   return null;
 }
 
+// A URI that still points at the local device rather than a hosted URL.
+export const isLocalUri = (u) =>
+  typeof u === 'string' &&
+  (u.startsWith('file:') ||
+    u.startsWith('content:') ||
+    u.startsWith('ph:') ||
+    u.startsWith('assets-library:'));
+
 // Haversine distance in miles between two { lat, lng } points.
 function milesBetween(a, b) {
   if (!a || !b || a.lat == null || a.lng == null || b.lat == null || b.lng == null) return null;
@@ -255,6 +263,28 @@ export async function saveProfile(userId, patch) {
   };
   for (const [appKey, col] of Object.entries(map)) {
     if (patch[appKey] !== undefined) profilePatch[col] = patch[appKey];
+  }
+
+  // Photos picked during registration are still local device URIs at this point
+  // (there was no user id to upload them under yet). Upload any local URI to
+  // Storage and save the resulting public URL, otherwise the profile would hold
+  // a file:// path that no other device can load.
+  if (isLocalUri(profilePatch.avatar)) {
+    const { url } = await uploadImage(userId, profilePatch.avatar, 'avatar');
+    if (url) profilePatch.avatar = url;
+  }
+  if (isLocalUri(profilePatch.cover)) {
+    const { url } = await uploadImage(userId, profilePatch.cover, 'cover');
+    if (url) profilePatch.cover = url;
+  }
+  if (Array.isArray(profilePatch.photos)) {
+    profilePatch.photos = await Promise.all(
+      profilePatch.photos.map(async (p) => {
+        if (!isLocalUri(p)) return p;
+        const { url } = await uploadImage(userId, p, 'photo');
+        return url || p;
+      })
+    );
   }
 
   // When a city is being saved without explicit coordinates (registration, or
@@ -978,6 +1008,21 @@ export async function getBlockedIds() {
     return [...mock.blockedIds];
   }
 }
+// Permanently delete the signed-in user's account and all their data. Runs a
+// SECURITY DEFINER function server-side because the client key deliberately
+// can't delete auth users. Returns { ok } — callers should only sign out and
+// show success when ok is true, so a failure isn't reported as a deletion.
+export async function deleteMyAccount() {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  try {
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) return { ok: false, error };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e };
+  }
+}
+
 export async function reportUser({ userId, reason, details }) {
   return write(async () => {
     const uid = await currentUid();
@@ -1089,6 +1134,7 @@ export default {
   blockUser,
   unblockUser,
   getBlockedIds,
+  deleteMyAccount,
   reportUser,
   getSettings,
   saveSettings,

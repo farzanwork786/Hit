@@ -73,7 +73,19 @@ export default function SettingsScreen({ navigation }) {
           onPress: () =>
             Alert.alert('Are you absolutely sure?', 'Your account will be deleted right away.', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: deleteAccount },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: async () => {
+                  const res = await deleteAccount();
+                  if (res && res.ok === false) {
+                    Alert.alert(
+                      'Could not delete account',
+                      'Something went wrong and your account was not deleted. Please try again.'
+                    );
+                  }
+                },
+              },
             ]),
         },
       ]

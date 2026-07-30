@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppButton, Field, KeyboardDoneBar } from '../components/ui';
 import RatingSelector, { LevelGuideModal } from '../components/RatingSelector';
 import CityField from '../components/CityField';
+import PhotoGrid from '../components/PhotoGrid';
 import SportIcon from '../components/SportIcon';
 import { useAuth } from '../context/AuthContext';
 import { SPORTS, SPORT_KEYS } from '../lib/ratings';
@@ -31,6 +32,10 @@ const COMMUNITY_PHOTOS = [
   'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=900&q=80',
   'https://images.unsplash.com/photo-1530915365347-e35b749a0381?w=900&q=80',
 ];
+
+// Browse cards look dead when profiles have no imagery, so new players add a
+// couple of photos up front rather than leaving blank placeholders behind.
+const MIN_PHOTOS = 2;
 
 const emptySport = () => ({ rating: null });
 
@@ -56,7 +61,7 @@ export default function RegistrationScreen({ navigation }) {
 
   const STEPS = isCommunity
     ? ['Your club', 'Sports', 'Location']
-    : ['Account', 'Your sports', 'Your level', 'Location'];
+    : ['Account', 'Your sports', 'Your level', 'Photos', 'Location'];
 
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -71,6 +76,7 @@ export default function RegistrationScreen({ navigation }) {
     communitySports: [],
     communityType: 'Club',
     photo: COMMUNITY_PHOTOS[0],
+    photos: [],
     hand: 'Right',
     bio: '',
     city: '',
@@ -118,6 +124,9 @@ export default function RegistrationScreen({ navigation }) {
         if (sp.rating == null) e[`level-${s}`] = `Pick your ${SPORTS[s].label.toLowerCase()} skill level.`;
       }
     }
+    if (label === 'Photos' && (form.photos?.length || 0) < MIN_PHOTOS) {
+      e.photos = `Add at least ${MIN_PHOTOS} photos so players can see who they're meeting.`;
+    }
     if (label === 'Location' && !form.city.trim()) e.city = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -157,6 +166,12 @@ export default function RegistrationScreen({ navigation }) {
           hand: form.hand,
           bio: form.bio,
           city: form.city,
+          // Seed the avatar and card background from the photos they just
+          // added, so their Browse card is complete the moment they join.
+          // saveProfile uploads these local URIs and stores the public URLs.
+          photos: form.photos,
+          avatar: form.photos[0],
+          cover: form.photos[1] || form.photos[0],
         };
 
     if (isSupabaseConfigured) {
@@ -230,6 +245,7 @@ export default function RegistrationScreen({ navigation }) {
               onOpenGuide={setGuideSport}
             />
           )}
+          {label === 'Photos' && <StepPhotos form={form} set={set} errors={errors} />}
           {label === 'Location' && (
             <StepLocation form={form} set={set} errors={errors} isCommunity={isCommunity} />
           )}
@@ -434,6 +450,29 @@ function SportLevelBlock({ sport, sp, setSportField, error, onOpenGuide }) {
   );
 }
 
+// --- Player: photos -----------------------------------------------------
+function StepPhotos({ form, set, errors }) {
+  const count = form.photos?.length || 0;
+  return (
+    <View>
+      <Text style={styles.lead}>
+        Add at least {MIN_PHOTOS} photos. Players are far more likely to reach out
+        when they can see who they'd be meeting.
+      </Text>
+
+      <PhotoGrid photos={form.photos || []} onChange={(photos) => set({ photos })} max={6} />
+
+      <Text style={styles.photoHint}>
+        {count === 0
+          ? 'Your first photo becomes your profile picture.'
+          : `${count} of ${MIN_PHOTOS} added${count >= MIN_PHOTOS ? ' — you can add more later.' : '.'}`}
+      </Text>
+
+      {errors.photos ? <Text style={styles.submitError}>{errors.photos}</Text> : null}
+    </View>
+  );
+}
+
 // --- Location -----------------------------------------------------------
 function StepLocation({ form, set, errors, isCommunity }) {
   return (
@@ -510,6 +549,7 @@ const styles = StyleSheet.create({
   privacyNote: { flexDirection: 'row', gap: 10, backgroundColor: colors.blueTint, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm },
   privacyText: { flex: 1, fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.slate600 },
   submitError: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.red, marginTop: spacing.md },
+  photoHint: { fontFamily: fonts.body, fontSize: 13, color: colors.slate500, marginTop: spacing.md },
   footer: { padding: spacing.xl, paddingTop: spacing.md },
 
   ratingNote: {

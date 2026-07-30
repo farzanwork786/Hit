@@ -12,10 +12,21 @@ import { colors, fonts, radius, spacing, shadow } from '../theme';
 export default function PlayerCard({ player, sport = 'tennis', onPress }) {
   const meta = SPORTS[sport];
   const level = ratingShort(player, sport); // null when skill level not set
+  // Accounts created before photos were required may still have none. Fall back
+  // to the next best image, then to a branded placeholder, so a card is never a
+  // blank grey rectangle.
+  const coverUri = player.cover || player.avatar || player.photos?.[0] || null;
+  const avatarUri = player.avatar || player.photos?.[0] || null;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.96 }]}>
       <View style={styles.cover}>
-        <Image source={{ uri: player.cover }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+        {coverUri ? (
+          <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, styles.coverPlaceholder]}>
+            <SportIcon sport={sport} size={44} color={colors.slate300} />
+          </View>
+        )}
         <LinearGradient colors={['transparent', 'rgba(15,23,42,0.85)']} style={StyleSheet.absoluteFill} />
         {level != null ? (
           <View style={styles.levelBadge}>
@@ -30,7 +41,13 @@ export default function PlayerCard({ player, sport = 'tennis', onPress }) {
           </View>
         ) : null}
         <View style={styles.coverFooter}>
-          <Image source={{ uri: player.avatar }} style={styles.avatar} contentFit="cover" />
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatar} contentFit="cover" />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Ionicons name="person" size={22} color={colors.slate400} />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
               <Text style={styles.name}>
@@ -119,6 +136,8 @@ const styles = StyleSheet.create({
   levelBadgeText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.white },
   coverFooter: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, gap: 10 },
   avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: colors.white },
+  avatarPlaceholder: { backgroundColor: colors.slate200, alignItems: 'center', justifyContent: 'center' },
+  coverPlaceholder: { backgroundColor: colors.slate100, alignItems: 'center', justifyContent: 'center' },
   nameRow: { flexDirection: 'row', alignItems: 'center' },
   name: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.white },
   city: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 1 },

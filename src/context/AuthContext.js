@@ -227,10 +227,16 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Permanently delete the account, as promised by the confirmation dialog and
+  // required by App Store guideline 5.1.1(v). Only signs out once the server
+  // confirms deletion, so a failure surfaces instead of looking like it worked.
   async function deleteAccount() {
-    // Real account row deletion needs a privileged server call; here we sign out
-    // and clear local state. (A Supabase Edge Function can hard-delete later.)
+    const res = await api.deleteMyAccount();
+    if (res && res.ok === false) {
+      return { ok: false, error: res.error };
+    }
     await signOut();
+    return { ok: true };
   }
 
   async function completeDemoOnboarding(draft) {
