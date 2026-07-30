@@ -587,7 +587,11 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
   try {
     const { data, error } = await supabase
       .from('court_posts')
-      .select('*,author:profiles(' + PROFILE_COLS + ')')
+      // The FK name is REQUIRED here. profiles is reachable from court_posts two
+      // ways — directly via author_id, and many-to-many via court_post_likes —
+      // so an unqualified embed is ambiguous and PostgREST rejects the whole
+      // query (PGRST201), which silently emptied the entire Court Board.
+      .select('*,author:profiles!court_posts_author_id_fkey(' + PROFILE_COLS + ')')
       .eq('sport', sport)
       .order('created_at', { ascending: false })
       .limit(100);
@@ -751,7 +755,9 @@ export async function getCommunity(id) {
       supabase.from('communities').select('*').eq('id', id).single(),
       supabase
         .from('community_posts')
-        .select('*,author:profiles(' + PROFILE_COLS + ')')
+        // Same ambiguity as court_posts (author_id vs community_post_likes) —
+        // the FK name must be explicit or the community board comes back empty.
+        .select('*,author:profiles!community_posts_author_id_fkey(' + PROFILE_COLS + ')')
         .eq('community_id', id)
         .order('pinned', { ascending: false })
         .order('created_at', { ascending: false }),
