@@ -25,8 +25,9 @@ export function PushProvider({ children }) {
 
     registerForPushNotifications().then((token) => {
       setPushToken(token);
-      // Persist a real Expo push token so the backend can target this device.
-      if (token && token !== 'demo') api.savePushToken(token);
+      // Persist the Expo push token so the backend trigger can target this
+      // device when someone messages or sends this user a play request.
+      if (token) api.savePushToken(token);
     });
 
     // Badge bump whenever a notification arrives while the app is open.
