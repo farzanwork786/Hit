@@ -1,6 +1,5 @@
 // Bottom tab navigation for the main app.
 import React from 'react';
-import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -10,16 +9,17 @@ import CourtBoardScreen from '../screens/CourtBoardScreen';
 import CommunitiesScreen from '../screens/CommunitiesScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import MyProfileScreen from '../screens/MyProfileScreen';
+import { TABS, TAB_BAR_HEIGHT, TAB_BAR_PADDING_TOP, TAB_BAR_PADDING_BOTTOM } from './tabs';
 import { colors, fonts } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
-const ICONS = {
-  Browse: ['tennisball', 'tennisball-outline'],
-  CourtBoard: ['megaphone', 'megaphone-outline'],
-  Communities: ['people', 'people-outline'],
-  Messages: ['chatbubbles', 'chatbubbles-outline'],
-  MyProfile: ['person', 'person-outline'],
+const SCREENS = {
+  CourtBoard: CourtBoardScreen,
+  Browse: BrowseScreen,
+  Communities: CommunitiesScreen,
+  Messages: MessagesScreen,
+  MyProfile: MyProfileScreen,
 };
 
 export default function MainTabs() {
@@ -35,22 +35,25 @@ export default function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          height: TAB_BAR_HEIGHT,
+          paddingTop: TAB_BAR_PADDING_TOP,
+          paddingBottom: TAB_BAR_PADDING_BOTTOM,
         },
         tabBarLabelStyle: { fontFamily: fonts.bodyMedium, fontSize: 11 },
         tabBarIcon: ({ focused, color, size }) => {
-          const [active, inactive] = ICONS[route.name];
-          return <Ionicons name={focused ? active : inactive} size={size} color={color} />;
+          const tab = TABS.find((t) => t.name === route.name);
+          return <Ionicons name={focused ? tab.icon : tab.iconOutline} size={size} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="CourtBoard" component={CourtBoardScreen} options={{ title: 'Court Board' }} />
-      <Tab.Screen name="Browse" component={BrowseScreen} options={{ title: 'Browse' }} />
-      <Tab.Screen name="Communities" component={CommunitiesScreen} options={{ title: 'Communities' }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages' }} />
-      <Tab.Screen name="MyProfile" component={MyProfileScreen} options={{ title: 'Profile' }} />
+      {TABS.map((tab) => (
+        <Tab.Screen
+          key={tab.name}
+          name={tab.name}
+          component={SCREENS[tab.name]}
+          options={{ title: tab.title }}
+        />
+      ))}
     </Tab.Navigator>
     </>
   );
