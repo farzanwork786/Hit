@@ -24,7 +24,8 @@ import SportIcon from '../components/SportIcon';
 import CityField from '../components/CityField';
 import { LocationChip, LocationPickerModal } from '../components/LocationPicker';
 import { POST_LEVELS } from '../lib/mockData';
-import { EMPTY_PROFILE } from '../lib/profile';
+import { EMPTY_PROFILE, displayName } from '../lib/profile';
+import { sessionType, spotsLabel, isFull, SESSION_TYPES, SPOT_OPTIONS } from '../lib/sessionTypes';
 import * as api from '../lib/api';
 import { notifyCourtBoardReply } from '../lib/notifications';
 import { SPORTS } from '../lib/ratings';
@@ -51,6 +52,10 @@ export default function CourtBoardScreen({ navigation }) {
   const [locOpen, setLocOpen] = useState(false);
   const [editingPost, setEditingPost] = useState(null); // post being edited (or null)
   const [menuPost, setMenuPost] = useState(null); // post whose ⋯ menu is open
+  const [tab, setTab] = useState('nearby'); // 'nearby' | 'mine'
+  const [joinCounts, setJoinCounts] = useState({});
+  const [joinedIds, setJoinedIds] = useState(new Set());
+  const [myHits, setMyHits] = useState({ upcoming: [], pending: [], past: [] });
 
   const load = useCallback(
     async ({ silent } = {}) => {
@@ -70,11 +75,35 @@ export default function CourtBoardScreen({ navigation }) {
         const locals = prev.filter((p) => String(p.id).startsWith('local-'));
         return [...locals, ...result.filter((r) => !locals.some((l) => l.id === r.id))];
       });
+      // How many people are in on each post, so cards can show spots left.
+      const ids = (result || []).map((p) => p.id).filter((id) => !String(id).startsWith('local-'));
+      setJoinCounts(await api.getCourtPostJoinCounts(ids));
       setLoading(false);
       setRefreshing(false);
     },
     [sport, maxDistance, activeCoords, isSupabaseConfigured]
   );
+
+  // Badge on the My Hits tab: things confirmed plus anything awaiting your reply.
+  const upcomingCount =
+    myHits.upcoming.length + myHits.pending.filter((h) => h.awaitingMe).length;
+
+  // Everything the user has arranged, for the My Hits tab.
+  const loadMyHits = useCallback(async () => {
+    const hits = await api.getMyHits();
+    setMyHits(hits);
+    // Posts you've already joined shouldn't offer "I'm in" again.
+    const joined = new Set(
+      [...hits.upcoming, ...hits.pending, ...hits.past]
+        .map((h) => h.courtPostId)
+        .filter(Boolean)
+    );
+    setJoinedIds(joined);
+  }, []);
+
+  useEffect(() => {
+    loadMyHits();
+  }, [loadMyHits]);
 
   useEffect(() => {
     load();
@@ -89,6 +118,45 @@ export default function CourtBoardScreen({ navigation }) {
   function onRefresh() {
     setRefreshing(true);
     load({ silent: true });
+  }
+
+  // "I'm in" — commits you to the session and drops a reply carrying the post's
+  // details into your thread with the author, so they can see what it's about.
+  async function joinPost(post) {
+    if (!post?.author || post.author.id === myId) return;
+    setJoinedIds((prev) => new Set(prev).add(post.id));
+    setJoinCounts((prev) => ({ ...prev, [post.id]: (prev[post.id] || 0) + 1 }));
+
+    const res = await api.joinCourtPost({ ...post, authorId: post.author.id });
+    if (res && res.ok === false) {
+      // Roll back so the card doesn't claim you're in when you aren't.
+      setJoinedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(post.id);
+        return next;
+      });
+      setJoinCounts((prev) => ({ ...prev, [post.id]: Math.max((prev[post.id] || 1) - 1, 0) }));
+      Alert.alert('Could not join', 'Please try again.');
+      return;
+    }
+    notifyCourtBoardReply(me);
+    navigation.navigate('ChatDetail', {
+      player: post.author,
+      chatId: res?.conversationId || undefined,
+      sport: post.sport || sport,
+    });
+  }
+
+  // Ask a question without committing.
+  async function messageAuthor(post) {
+    if (!post?.author || post.author.id === myId) return;
+    const postSport = post.sport || sport;
+    const conv = await api.getOrCreateConversation(post.author.id, postSport);
+    navigation.navigate('ChatDetail', {
+      player: post.author,
+      chatId: conv?.id || undefined,
+      sport: postSport,
+    });
   }
 
   const data = posts;
@@ -192,6 +260,46 @@ export default function CourtBoardScreen({ navigation }) {
         />
       </View>
 
+      {/* Nearby vs what you've already arranged — both live here so everything
+          about organising a hit is in one place. */}
+      <View style={styles.segment}>
+        <Pressable
+          style={[styles.segmentBtn, tab === 'nearby' && styles.segmentBtnActive]}
+          onPress={() => setTab('nearby')}
+        >
+          <Text style={[styles.segmentText, tab === 'nearby' && styles.segmentTextActive]}>
+            Nearby
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.segmentBtn, tab === 'mine' && styles.segmentBtnActive]}
+          onPress={() => {
+            setTab('mine');
+            loadMyHits();
+          }}
+        >
+          <Text style={[styles.segmentText, tab === 'mine' && styles.segmentTextActive]}>
+            My Hits
+          </Text>
+          {upcomingCount > 0 ? (
+            <View style={styles.segmentBadge}>
+              <Text style={styles.segmentBadgeText}>{upcomingCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      </View>
+
+      {tab === 'mine' ? (
+        <MyHitsView
+          hits={myHits}
+          onOpenChat={(hit) =>
+            hit.player &&
+            navigation.navigate('ChatDetail', { player: hit.player, sport: hit.sport })
+          }
+          onRefresh={loadMyHits}
+        />
+      ) : (
+      <>
       <View style={styles.toggleRow}>
         <SportToggle />
         {/* Same active location as Browse — shown here so it's clear which
@@ -225,25 +333,12 @@ export default function CourtBoardScreen({ navigation }) {
             <CourtPost
               post={item}
               isMine={isMine}
+              joined={joinedIds.has(item.id)}
+              joinCount={joinCounts[item.id] || 0}
               onMenu={() => setMenuPost(item)}
               onPress={() => item.author && navigation.navigate('PlayerProfile', { player: item.author })}
-              onReply={async () => {
-                if (!item.author || isMine) return;
-                notifyCourtBoardReply(me);
-                // First contact goes through the same request gate as Browse:
-                // the conversation is created lazily on the first message.
-                const postSport = item.sport || sport;
-                await api.sendMatchRequest(
-                  item.author.id,
-                  `Hi! Replying to your Court Board post${item.court ? ` at ${item.court}` : ''}.`,
-                  postSport
-                );
-                navigation.navigate('ChatDetail', {
-                  player: item.author,
-                  isRequest: true,
-                  sport: postSport,
-                });
-              }}
+              onJoin={() => joinPost(item)}
+              onMessage={() => messageAuthor(item)}
             />
           );
         }}
@@ -265,6 +360,8 @@ export default function CourtBoardScreen({ navigation }) {
           )
         }
       />
+      </>
+      )}
 
       <ComposerSheet
         // Remount on sport/location switch, and whenever the edit target changes
@@ -335,6 +432,10 @@ function ComposerSheet({ visible, sport, defaultLocation, editingPost, onClose, 
   const [level, setLevel] = useState(
     editingPost && levels.includes(editingPost.level) ? editingPost.level : levels[0]
   );
+  const [type, setType] = useState(editingPost?.sessionType || null);
+  const [spots, setSpots] = useState(
+    editingPost?.spotsNeeded !== undefined ? editingPost.spotsNeeded : 1
+  );
 
   function post() {
     if (!text.trim() || !court.trim()) return;
@@ -344,11 +445,15 @@ function ComposerSheet({ visible, sport, defaultLocation, editingPost, onClose, 
       city: location || defaultLocation,
       when: when.trim() || 'Flexible',
       level: levels.includes(level) ? level : levels[0],
+      sessionType: type,
+      spotsNeeded: spots,
     });
     setText('');
     setCourt('');
     setWhen('');
     setLevel(levels[0]);
+    setType(null);
+    setSpots(1);
   }
 
   const canPost = text.trim().length > 0 && court.trim().length > 0;
@@ -420,6 +525,36 @@ function ComposerSheet({ visible, sport, defaultLocation, editingPost, onClose, 
                 onChangeText={setWhen}
               />
 
+              <Text style={styles.levelLabel}>What are you after?</Text>
+              <View style={styles.levelWrap}>
+                {SESSION_TYPES.map((s) => (
+                  <Pressable
+                    key={s.key}
+                    onPress={() => setType(type === s.key ? null : s.key)}
+                    style={[styles.levelChip, type === s.key && styles.levelChipActive]}
+                  >
+                    <Text style={[styles.levelChipText, type === s.key && { color: colors.white }]}>
+                      {s.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.levelLabel}>How many players do you need?</Text>
+              <View style={styles.levelWrap}>
+                {SPOT_OPTIONS.map((o) => (
+                  <Pressable
+                    key={String(o.value)}
+                    onPress={() => setSpots(o.value)}
+                    style={[styles.levelChip, spots === o.value && styles.levelChipActive]}
+                  >
+                    <Text style={[styles.levelChipText, spots === o.value && { color: colors.white }]}>
+                      {o.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
               <Text style={styles.levelLabel}>Level</Text>
               <View style={styles.levelWrap}>
                 {levels.map((l) => (
@@ -448,7 +583,11 @@ function ComposerSheet({ visible, sport, defaultLocation, editingPost, onClose, 
   );
 }
 
-function CourtPost({ post, isMine, onMenu, onPress, onReply }) {
+function CourtPost({ post, isMine, joined, joinCount = 0, onMenu, onPress, onJoin, onMessage }) {
+  const type = sessionType(post.sessionType);
+  const full = isFull(post.spotsNeeded, joinCount);
+  const spots = spotsLabel(post.spotsNeeded, joinCount);
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>
@@ -456,23 +595,37 @@ function CourtPost({ post, isMine, onMenu, onPress, onReply }) {
           <Image source={{ uri: post.author.avatar }} style={styles.avatar} contentFit="cover" />
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
-              <Text style={styles.author}>{post.author.name}</Text>
+              <Text style={styles.author}>{displayName(post.author)}</Text>
               {isMine ? <Text style={styles.youTag}>You</Text> : null}
               {post.author.verified ? (
                 <Ionicons name="checkmark-circle" size={14} color={colors.blue} style={{ marginLeft: 4 }} />
               ) : null}
             </View>
             <Text style={styles.meta}>
-              {post.timeAgo} ago{post.distance ? ` · ${post.distance} mi away` : ''}
+              {post.timeAgo} ago{post.distance != null ? ` · ${post.distance} mi away` : ''}
             </Text>
           </View>
         </Pressable>
-        <Tag label={post.level} tone="navy" />
         {isMine ? (
           <Pressable onPress={onMenu} hitSlop={8} style={styles.postMenuBtn}>
             <Ionicons name="ellipsis-horizontal" size={18} color={colors.slate500} />
           </Pressable>
         ) : null}
+      </View>
+
+      {/* What kind of session + who it's for, up front so people can tell at a
+          glance whether it's for them. */}
+      <View style={styles.tagStrip}>
+        {type ? <Tag label={type.label} tone="blue" icon={type.icon} /> : null}
+        {post.level ? <Tag label={post.level} tone="neutral" /> : null}
+        <View style={[styles.spotsPill, full && styles.spotsPillFull]}>
+          <Ionicons
+            name={full ? 'checkmark-circle' : 'people-outline'}
+            size={12}
+            color={full ? colors.green : colors.slate600}
+          />
+          <Text style={[styles.spotsText, full && { color: colors.green }]}>{spots}</Text>
+        </View>
       </View>
 
       <Text style={styles.text}>{post.text}</Text>
@@ -482,17 +635,108 @@ function CourtPost({ post, isMine, onMenu, onPress, onReply }) {
         <Detail icon="calendar-outline" text={post.when} />
       </View>
 
-      <View style={styles.cardFooter}>
-        <View style={styles.actions}>
-          <Action icon="heart-outline" label={post.likes} />
-          <Action icon="chatbubble-outline" label={post.comments} />
+      {isMine ? (
+        <View style={styles.ownerFooter}>
+          <Ionicons name="people" size={15} color={colors.slate500} />
+          <Text style={styles.ownerFooterText}>
+            {joinCount > 0
+              ? `${joinCount} ${joinCount === 1 ? 'person is' : 'people are'} in — check Messages`
+              : 'No one has joined yet'}
+          </Text>
         </View>
-        <Pressable style={styles.replyBtn} onPress={onReply}>
-          <Ionicons name="paper-plane-outline" size={15} color={colors.white} />
-          <Text style={styles.replyText}>I'm in</Text>
-        </Pressable>
-      </View>
+      ) : (
+        <View style={styles.cardFooter}>
+          <Pressable style={styles.msgBtn} onPress={onMessage}>
+            <Ionicons name="chatbubble-outline" size={16} color={colors.slate600} />
+            <Text style={styles.msgBtnText}>Message</Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.joinBtn,
+              joined && styles.joinBtnDone,
+              full && !joined && styles.joinBtnFull,
+            ]}
+            onPress={onJoin}
+            disabled={joined || full}
+          >
+            <Ionicons
+              name={joined ? 'checkmark-circle' : 'hand-right'}
+              size={19}
+              color={colors.white}
+            />
+            <Text style={styles.joinText}>
+              {joined ? "You're in" : full ? 'Full' : "I'm in"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </View>
+  );
+}
+
+// Everything you've arranged, in one place: what's confirmed, what's still
+// waiting on someone, and what's already happened.
+function MyHitsView({ hits, onOpenChat, onRefresh }) {
+  const sections = [
+    { key: 'upcoming', title: 'Upcoming', data: hits.upcoming },
+    { key: 'pending', title: 'Waiting on a reply', data: hits.pending },
+    { key: 'past', title: 'Past', data: hits.past },
+  ].filter((s) => s.data.length);
+
+  if (!sections.length) {
+    return (
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={undefined}
+      >
+        <EmptyState
+          icon="calendar-outline"
+          title="Nothing booked yet"
+          subtitle="Join a session on the board, or ask someone to hit from their profile."
+        />
+      </ScrollView>
+    );
+  }
+
+  return (
+    <FlatList
+      data={sections}
+      keyExtractor={(s) => s.key}
+      onRefresh={onRefresh}
+      refreshing={false}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      renderItem={({ item: section }) => (
+        <View style={{ marginBottom: spacing.lg }}>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+          {section.data.map((h) => (
+            <Pressable key={h.id} style={styles.hitRow} onPress={() => onOpenChat(h)}>
+              <View style={styles.hitRowIcon}>
+                <SportIcon sport={h.sport || 'tennis'} size={18} color={colors.blue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.hitRowWhen}>
+                  {h.whenText || 'Time to be confirmed'}
+                </Text>
+                <Text style={styles.hitRowWho} numberOfLines={1}>
+                  {displayName(h.player)}
+                  {h.court ? ` · ${h.court}` : ''}
+                </Text>
+              </View>
+              {h.awaitingMe ? (
+                <View style={styles.hitRowBadge}>
+                  <Text style={styles.hitRowBadgeText}>Reply</Text>
+                </View>
+              ) : h.status === 'proposed' ? (
+                <Text style={styles.hitRowPending}>Sent</Text>
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.slate400} />
+              )}
+            </Pressable>
+          ))}
+        </View>
+      )}
+    />
   );
 }
 
@@ -504,15 +748,6 @@ function Detail({ icon, text }) {
         {text}
       </Text>
     </View>
-  );
-}
-
-function Action({ icon, label }) {
-  return (
-    <Pressable style={styles.action}>
-      <Ionicons name={icon} size={18} color={colors.slate500} />
-      <Text style={styles.actionText}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -588,19 +823,126 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.slate100,
   },
-  actions: { flexDirection: 'row', gap: spacing.lg },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.slate500 },
-  replyBtn: {
+
+  // Joining is the point of the board, so "I'm in" is the biggest thing on the
+  // card; asking a question sits beside it as the quieter option.
+  joinBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: colors.blue,
+    height: 52,
+    borderRadius: radius.md,
+  },
+  joinBtnDone: { backgroundColor: colors.green },
+  joinBtnFull: { backgroundColor: colors.slate300 },
+  joinText: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.white },
+  msgBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     paddingHorizontal: 16,
-    height: 38,
+    height: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.slate100,
+  },
+  msgBtnText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.slate600 },
+
+  tagStrip: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: spacing.sm },
+  spotsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.slate100,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: radius.pill,
   },
-  replyText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.white },
+  spotsPillFull: { backgroundColor: colors.greenLight },
+  spotsText: { fontFamily: fonts.bodyMedium, fontSize: 11.5, color: colors.slate600 },
+
+  ownerFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.slate100,
+  },
+  ownerFooterText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.slate500, flex: 1 },
+
+  segment: {
+    flexDirection: 'row',
+    gap: 6,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.slate100,
+    borderRadius: radius.md,
+    padding: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 38,
+    borderRadius: radius.sm,
+  },
+  segmentBtnActive: { backgroundColor: colors.white, ...shadow.soft },
+  segmentText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.slate500 },
+  segmentTextActive: { color: colors.navy },
+  segmentBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  segmentBadgeText: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.white },
+
+  sectionTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.slate500,
+    marginBottom: spacing.sm,
+    letterSpacing: 0.3,
+  },
+  hitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  hitRowIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.blueTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hitRowWhen: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.navy },
+  hitRowWho: { fontFamily: fonts.body, fontSize: 13, color: colors.slate500, marginTop: 2 },
+  hitRowBadge: {
+    backgroundColor: colors.blue,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  hitRowBadgeText: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.white },
+  hitRowPending: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.slate400 },
 
   sheetBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   sheet: {

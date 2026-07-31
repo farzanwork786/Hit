@@ -658,6 +658,8 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
         when: p.when_text,
         level: p.level,
         text: p.body,
+        sessionType: p.session_type,
+        spotsNeeded: p.spots_needed,
         likes: p.likes || 0,
         comments: p.comments || 0,
         timeAgo: timeAgo(p.created_at),
@@ -697,6 +699,8 @@ export async function createCourtPost(draft) {
         when_text: draft.when,
         level: draft.level,
         body: draft.text,
+        session_type: draft.sessionType ?? null,
+        spots_needed: draft.spotsNeeded ?? null,
       })
       .select('id')
       .single();
@@ -714,6 +718,8 @@ export async function updateCourtPost(id, draft) {
         when_text: draft.when,
         level: draft.level,
         body: draft.text,
+        session_type: draft.sessionType ?? null,
+        spots_needed: draft.spotsNeeded ?? null,
       })
       .eq('id', id)
   );
