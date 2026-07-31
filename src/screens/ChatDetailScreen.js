@@ -26,6 +26,7 @@ import { RatingSummary } from '../components/SportIcon';
 import { useSport } from '../context/SportContext';
 import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import { firstName } from '../lib/profile';
+import AskToHitSheet from '../components/AskToHitSheet';
 import { colors, fonts, spacing, radius } from '../theme';
 
 export default function ChatDetailScreen({ route, navigation }) {
@@ -39,6 +40,48 @@ export default function ChatDetailScreen({ route, navigation }) {
   const listRef = useRef(null);
   const myUidRef = useRef(null);
   const promotedRef = useRef(false); // guards the request→chat promotion
+  const [askOpen, setAskOpen] = useState(false);
+
+  // Accept / decline a hit straight from its card. Updates the card in place so
+  // the thread reflects the outcome immediately, then persists.
+  async function respondToHit(hitId, status) {
+    if (!hitId) return;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.kind === 'hit' && m.meta?.hitId === hitId
+          ? { ...m, meta: { ...m.meta, status } }
+          : m
+      )
+    );
+    const res = await api.respondToHit(hitId, status, { conversationId: chatId });
+    if (res && res.ok === false) {
+      Alert.alert('Could not update', 'Please try again.');
+      return;
+    }
+    const fresh = await api.getMessages(chatId);
+    if (fresh?.length) setMessages(fresh);
+  }
+
+  // Create a hit and post its card into this thread.
+  async function askToHit(draft) {
+    setAskOpen(false);
+    const res = await api.proposeHit({
+      ...draft,
+      inviteeId: player.id,
+      sport,
+      conversationId: chatId,
+    });
+    if (res && res.ok === false) {
+      Alert.alert('Could not send', 'Please try again.');
+      return;
+    }
+    if (!chatId && res?.conversationId) setChatId(res.conversationId);
+    const cid = chatId || res?.conversationId;
+    if (cid) {
+      const fresh = await api.getMessages(cid);
+      if (fresh?.length) setMessages(fresh);
+    }
+  }
 
   // Resolve the signed-in user's id once so realtime inserts can be attributed
   // to the correct side (mine = right, theirs = left).
@@ -215,7 +258,9 @@ export default function ChatDetailScreen({ route, navigation }) {
           ref={listRef}
           data={messages}
           keyExtractor={(m) => m.id}
-          renderItem={({ item }) => <Bubble msg={item} />}
+          renderItem={({ item }) => (
+            <MessageRow msg={item} onRespondToHit={respondToHit} />
+          )}
           contentContainerStyle={styles.messages}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           keyboardShouldPersistTaps="handled"
@@ -235,8 +280,8 @@ export default function ChatDetailScreen({ route, navigation }) {
 
         {/* Composer */}
         <View style={styles.composer}>
-          <Pressable style={styles.attachBtn}>
-            <Ionicons name="add" size={24} color={colors.slate500} />
+          <Pressable style={styles.attachBtn} onPress={() => setAskOpen(true)}>
+            <Ionicons name="tennisball" size={22} color={colors.blue} />
           </Pressable>
           <TextInput
             value={text}
@@ -258,6 +303,13 @@ export default function ChatDetailScreen({ route, navigation }) {
         </View>
       </KeyboardAvoidingView>
       <KeyboardDoneBar />
+
+      <AskToHitSheet
+        visible={askOpen}
+        playerName={firstName(player, 'them')}
+        onClose={() => setAskOpen(false)}
+        onSubmit={askToHit}
+      />
 
       {/* ⋯ Options sheet */}
       <Modal
@@ -340,13 +392,104 @@ function ChatSheetRow({ icon, label, onPress, destructive }) {
   );
 }
 
+// Picks how a row renders. Every interaction between two people lands in the
+// thread as one of these, so nothing happens "invisibly" elsewhere.
+function MessageRow({ msg, onRespondToHit }) {
+  if (msg.kind === 'system') return <SystemNote msg={msg} />;
+  if (msg.kind === 'hit') return <HitCard msg={msg} onRespond={onRespondToHit} />;
+  return <Bubble msg={msg} />;
+}
+
 function Bubble({ msg }) {
   const me = msg.fromMe;
+  const ref = msg.kind === 'court_ref' ? msg.meta : null;
   return (
     <View style={[styles.bubbleRow, { justifyContent: me ? 'flex-end' : 'flex-start' }]}>
-      <View style={[styles.bubble, me ? styles.bubbleMe : styles.bubbleThem]}>
-        <Text style={[styles.bubbleText, me && { color: colors.white }]}>{msg.text}</Text>
-        <Text style={[styles.bubbleTime, me && { color: 'rgba(255,255,255,0.7)' }]}>{msg.time}</Text>
+      <View style={{ maxWidth: '80%', alignItems: me ? 'flex-end' : 'flex-start' }}>
+        {/* Replying to a Court Board post shows what it's about, so a bare
+            "I'm in" is never context-free. */}
+        {ref ? (
+          <View style={[styles.refCard, me ? styles.refCardMe : styles.refCardThem]}>
+            <View style={styles.refHead}>
+              <Ionicons name="megaphone-outline" size={12} color={colors.slate500} />
+              <Text style={styles.refHeadText}>Court Board post</Text>
+            </View>
+            <Text style={styles.refTitle} numberOfLines={1}>
+              {[ref.when, ref.court].filter(Boolean).join(' · ') || 'Looking to play'}
+            </Text>
+          </View>
+        ) : null}
+        <View style={[styles.bubble, me ? styles.bubbleMe : styles.bubbleThem]}>
+          <Text style={[styles.bubbleText, me && { color: colors.white }]}>{msg.text}</Text>
+          <Text style={[styles.bubbleTime, me && { color: 'rgba(255,255,255,0.7)' }]}>{msg.time}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// Centred, quiet line for things that happened rather than things said.
+function SystemNote({ msg }) {
+  return (
+    <View style={styles.systemRow}>
+      <Text style={styles.systemText}>{msg.text}</Text>
+    </View>
+  );
+}
+
+// The scheduling card. The person who was asked gets the buttons; the asker
+// sees the same card with its current state.
+function HitCard({ msg, onRespond }) {
+  const m = msg.meta || {};
+  const status = m.status || 'proposed';
+  const canAnswer = !msg.fromMe && status === 'proposed';
+
+  const statusLabel = {
+    proposed: msg.fromMe ? 'Waiting for a reply' : 'Can you make it?',
+    accepted: "You're on",
+    declined: 'Declined',
+    cancelled: 'Cancelled',
+  }[status];
+
+  return (
+    <View style={[styles.bubbleRow, { justifyContent: msg.fromMe ? 'flex-end' : 'flex-start' }]}>
+      <View style={styles.hitCard}>
+        <View style={styles.hitHead}>
+          <Ionicons name="tennisball" size={14} color={colors.blue} />
+          <Text style={styles.hitHeadText}>Ask to hit</Text>
+        </View>
+
+        {m.scheduledAt ? (
+          <Text style={styles.hitWhen}>{api.whenLabel(m.scheduledAt)}</Text>
+        ) : null}
+        {m.court ? (
+          <View style={styles.hitMetaRow}>
+            <Ionicons name="location-outline" size={13} color={colors.slate500} />
+            <Text style={styles.hitMetaText} numberOfLines={1}>
+              {[m.court, m.city].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
+        ) : null}
+        {m.note ? <Text style={styles.hitNote}>{m.note}</Text> : null}
+
+        <Text style={styles.hitStatus}>{statusLabel}</Text>
+
+        {canAnswer ? (
+          <View style={styles.hitActions}>
+            <Pressable
+              style={[styles.hitBtn, styles.hitDecline]}
+              onPress={() => onRespond?.(m.hitId, 'declined')}
+            >
+              <Text style={styles.hitDeclineText}>Can't make it</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.hitBtn, styles.hitAccept]}
+              onPress={() => onRespond?.(m.hitId, 'accepted')}
+            >
+              <Text style={styles.hitAcceptText}>I'm in</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -394,6 +537,59 @@ const styles = StyleSheet.create({
   bubbleThem: { backgroundColor: colors.white, borderBottomLeftRadius: 6, borderWidth: 1, borderColor: colors.border },
   bubbleText: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.slate800 },
   bubbleTime: { fontFamily: fonts.body, fontSize: 10, color: colors.slate400, marginTop: 4, alignSelf: 'flex-end' },
+
+  // Court Board reference shown above a reply, so "I'm in" has context.
+  refCard: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 4,
+    maxWidth: '100%',
+  },
+  refCardMe: { borderColor: colors.blueLight },
+  refCardThem: {},
+  refHead: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  refHeadText: { fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.slate500 },
+  refTitle: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.navy, marginTop: 2 },
+
+  // Quiet centred line for events (accepted, declined, cancelled).
+  systemRow: { alignItems: 'center', paddingVertical: spacing.sm },
+  systemText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: colors.slate500,
+    backgroundColor: colors.slate100,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+
+  // The scheduling card.
+  hitCard: {
+    maxWidth: '85%',
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.blueLight,
+    padding: spacing.md,
+  },
+  hitHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  hitHeadText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.blue, letterSpacing: 0.3 },
+  hitWhen: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy },
+  hitMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  hitMetaText: { flex: 1, fontFamily: fonts.body, fontSize: 13, color: colors.slate600 },
+  hitNote: { fontFamily: fonts.body, fontSize: 13, color: colors.slate500, marginTop: 6, lineHeight: 18 },
+  hitStatus: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.slate400, marginTop: 8 },
+  hitActions: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
+  hitBtn: { flex: 1, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  hitDecline: { backgroundColor: colors.slate100 },
+  hitDeclineText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.slate600 },
+  hitAccept: { backgroundColor: colors.blue },
+  hitAcceptText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.white },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

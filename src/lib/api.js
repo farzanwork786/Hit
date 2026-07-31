@@ -550,7 +550,7 @@ export async function getMessages(conversationId) {
       const uid = await currentUid();
       const { data, error } = await supabase
         .from('messages')
-        .select('id,body,sender_id,created_at')
+        .select('id,body,sender_id,created_at,kind,meta')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
       if (error) return { data, error };
@@ -560,16 +560,29 @@ export async function getMessages(conversationId) {
           text: m.body,
           fromMe: m.sender_id === uid,
           time: clockTime(m.created_at),
+          // 'text' | 'court_ref' | 'hit' | 'system' — decides how the chat
+          // renders this row. Older rows have no kind and are plain text.
+          kind: m.kind || 'text',
+          meta: m.meta || null,
         })),
       };
     },
   });
 }
 
-export async function sendMessage(conversationId, body) {
+// Send a message. `kind` + `meta` turn it into a reference card, a hit
+// proposal, or a system event; `body` is always set so conversation previews
+// and push notifications have readable text regardless of kind.
+export async function sendMessage(conversationId, body, { kind = 'text', meta = null } = {}) {
   return write(async () => {
     const uid = await currentUid();
-    return supabase.from('messages').insert({ conversation_id: conversationId, sender_id: uid, body });
+    return supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: uid,
+      body,
+      kind,
+      meta,
+    });
   });
 }
 
@@ -941,40 +954,244 @@ export async function markAllNotificationsRead() {
 // ===========================================================================
 // SCHEDULED HITS
 // ===========================================================================
+// Short human summary of a hit, used for message bodies, conversation
+// previews and push text — anywhere a card can't be rendered.
+export function hitSummary({ court, scheduledAt }) {
+  const when = scheduledAt ? whenLabel(scheduledAt) : null;
+  return ['Asked to hit', when, court].filter(Boolean).join(' · ');
+}
+
+// "Today 7:00 PM" / "Sat 9:00 AM" / "Mar 3, 9:00 AM"
+export function whenLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (sameDay(d, now)) return `Today ${time}`;
+  if (sameDay(d, tomorrow)) return `Tomorrow ${time}`;
+  const withinWeek = (d - now) / 86400000 < 7 && d > now;
+  if (withinWeek) return `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+// Propose a hit to someone and drop the card into your conversation, so the
+// ask is visible in the thread rather than hidden in a separate list.
 export async function proposeHit(draft) {
-  return write(async () => {
+  if (!shouldTryLive()) return { ok: true, demo: true };
+  try {
     const uid = await currentUid();
-    return supabase.from('scheduled_hits').insert({
-      proposer_id: uid,
-      invitee_id: draft.inviteeId,
-      sport: draft.sport,
-      court: draft.court,
-      city: draft.city,
-      scheduled_at: draft.scheduledAt,
-      note: draft.note,
-    });
-  });
+    const { data: hit, error } = await supabase
+      .from('scheduled_hits')
+      .insert({
+        proposer_id: uid,
+        invitee_id: draft.inviteeId,
+        sport: draft.sport ?? null,
+        court: draft.court ?? null,
+        city: draft.city ?? null,
+        scheduled_at: draft.scheduledAt ?? null,
+        note: draft.note ?? null,
+        court_post_id: draft.courtPostId ?? null,
+      })
+      .select('*')
+      .single();
+    if (error) return { ok: false, error };
+    markReachable();
+
+    let conversationId = draft.conversationId;
+    if (!conversationId) {
+      const conv = await getOrCreateConversation(draft.inviteeId, draft.sport ?? null);
+      conversationId = conv?.id ?? null;
+    }
+    if (conversationId) {
+      await sendMessage(conversationId, hitSummary(draft), {
+        kind: 'hit',
+        meta: {
+          hitId: hit.id,
+          court: hit.court,
+          city: hit.city,
+          scheduledAt: hit.scheduled_at,
+          note: hit.note,
+          sport: hit.sport,
+        },
+      });
+    }
+    return { ok: true, hit, conversationId };
+  } catch (e) {
+    markUnreachable();
+    return { ok: false, error: e };
+  }
 }
-export async function getScheduledHits() {
-  return readList({
-    fallbackOnEmpty: false,
-    mockData: () => [],
-    live: async () => {
-      const uid = await currentUid();
-      const { data, error } = await supabase
-        .from('scheduled_hits')
-        .select('*')
-        .or(`proposer_id.eq.${uid},invitee_id.eq.${uid}`)
-        .order('scheduled_at', { ascending: true });
-      return { data, error };
-    },
-  });
+
+// Accept / decline / cancel, recording the outcome in the thread so both
+// people can see what happened without opening anything else.
+export async function respondToHit(hitId, status, { conversationId } = {}) {
+  if (!shouldTryLive()) return { ok: true, demo: true };
+  try {
+    const { data: hit, error } = await supabase
+      .from('scheduled_hits')
+      .update({ status })
+      .eq('id', hitId)
+      .select('*')
+      .single();
+    if (error) return { ok: false, error };
+    markReachable();
+
+    const said = {
+      accepted: "I'm in",
+      declined: "Can't make it",
+      cancelled: 'Hit cancelled',
+    }[status];
+    if (said && conversationId) {
+      await sendMessage(conversationId, said, {
+        kind: 'system',
+        meta: { hitId, status },
+      });
+    }
+    return { ok: true, hit };
+  } catch (e) {
+    markUnreachable();
+    return { ok: false, error: e };
+  }
 }
-export async function acceptHit(id) {
-  return write(() => supabase.from('scheduled_hits').update({ status: 'accepted' }).eq('id', id));
+
+// "I'm in" on a Court Board post. Creates the hit and posts a reply into the
+// existing DM thread, carrying a reference to the post so the author can see
+// what it's about (Instagram-style story reply).
+export async function joinCourtPost(post, message = "I'm in") {
+  if (!shouldTryLive()) return { ok: true, demo: true };
+  try {
+    const uid = await currentUid();
+    if (!post?.authorId || post.authorId === uid) {
+      return { ok: false, error: new Error('Cannot join your own post') };
+    }
+
+    const conv = await getOrCreateConversation(post.authorId, post.sport ?? null);
+    const conversationId = conv?.id ?? null;
+
+    const { data: hit } = await supabase
+      .from('scheduled_hits')
+      .insert({
+        proposer_id: post.authorId,
+        invitee_id: uid,
+        sport: post.sport ?? null,
+        court: post.court ?? null,
+        city: post.city ?? null,
+        note: post.text ?? null,
+        court_post_id: post.id,
+        status: 'accepted', // joining an open post is an acceptance, not an ask
+      })
+      .select('*')
+      .single();
+
+    if (conversationId) {
+      await sendMessage(conversationId, message, {
+        kind: 'court_ref',
+        meta: {
+          postId: post.id,
+          court: post.court,
+          city: post.city,
+          when: post.when,
+          sport: post.sport,
+          hitId: hit?.id ?? null,
+        },
+      });
+    }
+    return { ok: true, conversationId, hit };
+  } catch (e) {
+    markUnreachable();
+    return { ok: false, error: e };
+  }
 }
-export async function declineHit(id) {
-  return write(() => supabase.from('scheduled_hits').update({ status: 'declined' }).eq('id', id));
+
+// How many people have said they're in on each of the given posts.
+export async function getCourtPostJoinCounts(postIds = []) {
+  if (!shouldTryLive() || !postIds.length) return {};
+  try {
+    const { data, error } = await supabase
+      .from('scheduled_hits')
+      .select('court_post_id')
+      .in('court_post_id', postIds)
+      .neq('status', 'declined')
+      .neq('status', 'cancelled');
+    if (error) return {};
+    const counts = {};
+    for (const r of data || []) {
+      if (!r.court_post_id) continue;
+      counts[r.court_post_id] = (counts[r.court_post_id] || 0) + 1;
+    }
+    return counts;
+  } catch (e) {
+    return {};
+  }
+}
+
+// Everything the user has arranged, grouped for the My Hits view.
+export async function getMyHits() {
+  if (!shouldTryLive()) return { upcoming: [], pending: [], past: [] };
+  try {
+    const uid = await currentUid();
+    if (!uid) return { upcoming: [], pending: [], past: [] };
+
+    const { data, error } = await supabase
+      .from('scheduled_hits')
+      .select(
+        '*,proposer:profiles!scheduled_hits_proposer_id_fkey(' + PROFILE_COLS + ')' +
+        ',invitee:profiles!scheduled_hits_invitee_id_fkey(' + PROFILE_COLS + ')'
+      )
+      .or(`proposer_id.eq.${uid},invitee_id.eq.${uid}`)
+      .order('scheduled_at', { ascending: true, nullsFirst: false });
+    if (error) return { upcoming: [], pending: [], past: [] };
+    markReachable();
+
+    const now = Date.now();
+    const out = { upcoming: [], pending: [], past: [] };
+
+    for (const r of data || []) {
+      const mine = r.proposer_id === uid;
+      const other = dbProfileToApp(mine ? r.invitee : r.proposer, []);
+      const at = r.scheduled_at ? new Date(r.scheduled_at).getTime() : null;
+      const hit = {
+        id: r.id,
+        status: r.status,
+        sport: r.sport,
+        court: r.court,
+        city: r.city,
+        scheduledAt: r.scheduled_at,
+        whenText: r.scheduled_at ? whenLabel(r.scheduled_at) : null,
+        note: r.note,
+        courtPostId: r.court_post_id,
+        iProposed: mine,
+        player: other,
+        // Only the person who was asked can accept or decline.
+        awaitingMe: r.status === 'proposed' && !mine,
+      };
+
+      if (r.status === 'cancelled' || r.status === 'declined') continue;
+      if (at != null && at < now) out.past.push(hit);
+      else if (r.status === 'accepted') out.upcoming.push(hit);
+      else out.pending.push(hit);
+    }
+
+    out.past.reverse(); // most recent first
+    return out;
+  } catch (e) {
+    markUnreachable();
+    return { upcoming: [], pending: [], past: [] };
+  }
+}
+
+export async function acceptHit(id, opts) {
+  return respondToHit(id, 'accepted', opts);
+}
+export async function declineHit(id, opts) {
+  return respondToHit(id, 'declined', opts);
+}
+export async function cancelHit(id, opts) {
+  return respondToHit(id, 'cancelled', opts);
 }
 
 // ===========================================================================
@@ -1128,9 +1345,15 @@ export default {
   markNotificationRead,
   markAllNotificationsRead,
   proposeHit,
-  getScheduledHits,
+  respondToHit,
+  joinCourtPost,
+  getCourtPostJoinCounts,
+  getMyHits,
+  hitSummary,
+  whenLabel,
   acceptHit,
   declineHit,
+  cancelHit,
   blockUser,
   unblockUser,
   getBlockedIds,
