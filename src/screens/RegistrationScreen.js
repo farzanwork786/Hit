@@ -21,17 +21,12 @@ import RatingSelector, { LevelGuideModal } from '../components/RatingSelector';
 import CityField from '../components/CityField';
 import PhotoGrid from '../components/PhotoGrid';
 import SportIcon from '../components/SportIcon';
+import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import { SPORTS, SPORT_KEYS } from '../lib/ratings';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
 
 const COMMUNITY_TYPES = ['Club', 'Park', 'Group'];
-const COMMUNITY_PHOTOS = [
-  'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=900&q=80',
-  'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=900&q=80',
-  'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=900&q=80',
-  'https://images.unsplash.com/photo-1530915365347-e35b749a0381?w=900&q=80',
-];
 
 // Browse cards look dead when profiles have no imagery, so new players add a
 // couple of photos up front rather than leaving blank placeholders behind.
@@ -75,7 +70,7 @@ export default function RegistrationScreen({ navigation }) {
     sports: { tennis: null, pickleball: null }, // player: object; community uses communitySports
     communitySports: [],
     communityType: 'Club',
-    photo: COMMUNITY_PHOTOS[0],
+    photo: '',
     photos: [],
     hand: 'Right',
     bio: '',
@@ -109,6 +104,7 @@ export default function RegistrationScreen({ navigation }) {
     }
     if (label === 'Your club') {
       if (!form.name.trim()) e.name = 'Required';
+      if (!form.photo) e.photo = 'Add a cover photo so players recognise your community.';
       if (!form.email || !/^\S+@\S+\.\S+$/.test(form.email)) e.email = 'Enter a valid email';
       if (form.password.length < 6) e.password = 'Min 6 characters';
     }
@@ -318,18 +314,29 @@ function StepClub({ form, set, errors }) {
       </View>
 
       <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Cover photo</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-        {COMMUNITY_PHOTOS.map((p) => (
-          <Pressable key={p} onPress={() => set({ photo: p })} style={[styles.photoOption, form.photo === p && styles.photoOptionActive]}>
-            <Image source={{ uri: p }} style={styles.photoImg} />
-            {form.photo === p ? (
-              <View style={styles.photoCheck}>
-                <Ionicons name="checkmark" size={14} color={colors.white} />
-              </View>
-            ) : null}
-          </Pressable>
-        ))}
-      </ScrollView>
+      <Pressable
+        style={styles.coverPick}
+        onPress={async () => {
+          const uri = await pickImage({ aspect: [16, 9] });
+          if (uri) set({ photo: uri });
+        }}
+      >
+        {form.photo ? (
+          <>
+            <Image source={{ uri: form.photo }} style={StyleSheet.absoluteFill} />
+            <View style={styles.coverPickBadge}>
+              <Ionicons name="camera" size={14} color={colors.white} />
+              <Text style={styles.coverPickBadgeText}>Change photo</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.coverPickEmpty}>
+            <Ionicons name="image-outline" size={26} color={colors.slate400} />
+            <Text style={styles.coverPickText}>Add a cover photo</Text>
+          </View>
+        )}
+      </Pressable>
+      {errors.photo ? <Text style={styles.submitError}>{errors.photo}</Text> : null}
 
       <View style={{ marginTop: spacing.lg }}>
         <Field label="Login email" icon="mail-outline" placeholder="club@example.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={form.email} onChangeText={(t) => set({ email: t })} error={errors.email} />
@@ -541,10 +548,29 @@ const styles = StyleSheet.create({
   detailToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.md, marginBottom: spacing.sm },
   bioLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.lg },
 
-  photoOption: { width: 96, height: 64, borderRadius: radius.md, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  photoOptionActive: { borderColor: colors.blue },
-  photoImg: { width: '100%', height: '100%', backgroundColor: colors.slate200 },
-  photoCheck: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center' },
+  coverPick: {
+    height: 150,
+    borderRadius: radius.lg,
+    backgroundColor: colors.slate100,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  coverPickEmpty: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  coverPickText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.slate500 },
+  coverPickBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(15,23,42,0.6)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    margin: spacing.md,
+  },
+  coverPickBadgeText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.white },
 
   privacyNote: { flexDirection: 'row', gap: 10, backgroundColor: colors.blueTint, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm },
   privacyText: { flex: 1, fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.slate600 },

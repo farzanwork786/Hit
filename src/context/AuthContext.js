@@ -135,13 +135,23 @@ export function AuthProvider({ children }) {
         .eq('owner_id', userId)
         .limit(1);
       if (existing && existing.length) return;
+
+      // The cover was picked from the device during signup, so it's still a
+      // local file:// URI. Upload it first — saving the raw URI would leave the
+      // community page with an image only the owner's phone could load.
+      let photo = meta.photo;
+      if (api.isLocalUri(photo)) {
+        const { url } = await api.uploadImage(userId, photo, 'community');
+        if (url) photo = url;
+      }
+
       const { data: com } = await supabase
         .from('communities')
         .insert({
           owner_id: userId,
           name: meta.name,
-          photo: meta.photo,
-          cover: meta.cover || meta.photo,
+          photo,
+          cover: meta.cover && !api.isLocalUri(meta.cover) ? meta.cover : photo,
           description: meta.bio,
           city: meta.city,
           sports: Array.isArray(meta.sports) ? meta.sports : [],
