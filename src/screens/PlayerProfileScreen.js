@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppButton, Tag } from '../components/ui';
 import SportIcon, { SportChip } from '../components/SportIcon';
 import { SPORTS, SPORT_KEYS, playsSport, ratingShort } from '../lib/ratings';
-import { canSeeFriends, canSeeCommunities } from '../lib/profile';
+import { canSeeFriends, canSeeCommunities, displayName, firstName } from '../lib/profile';
 import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import * as api from '../lib/api';
 import { notifyMatchRequest } from '../lib/notifications';
@@ -112,9 +112,9 @@ export default function PlayerProfileScreen({ route, navigation }) {
 
   function handleBlock() {
     setMenuOpen(false);
-    const firstName = player.name.split(' ')[0];
+    const first = firstName(player, 'this player');
     Alert.alert(
-      `Block ${firstName}?`,
+      `Block ${first}?`,
       "They won't be able to see your profile and won't appear in Browse or Requests.",
       [
         { text: 'Cancel', style: 'cancel' },
@@ -151,7 +151,7 @@ export default function PlayerProfileScreen({ route, navigation }) {
 
   async function sendRequest() {
     notifyMatchRequest({ id: player.id, name: 'You' });
-    await api.sendMatchRequest(player.id, `Hey ${player.name.split(' ')[0]}! Want to hit sometime?`, sport);
+    await api.sendMatchRequest(player.id, `Hey ${firstName(player, 'there')}! Want to hit sometime?`, sport);
     // Deliberately do NOT create a conversation here. It's created lazily when
     // the first message is actually sent, so the recipient sees this as a single
     // play request (Requests tab) rather than appearing in both Requests and
@@ -239,7 +239,7 @@ export default function PlayerProfileScreen({ route, navigation }) {
           {/* Availability */}
           <Section title="Availability">
             <View style={styles.tagRow}>
-              {player.availability.map((a) => (
+              {(Array.isArray(player.availability) ? player.availability : []).map((a) => (
                 <Tag key={a} label={a} tone="green" icon="time-outline" />
               ))}
             </View>
@@ -258,7 +258,7 @@ export default function PlayerProfileScreen({ route, navigation }) {
                     >
                       <Image source={{ uri: f.avatar }} style={styles.friendAvatar} contentFit="cover" />
                       <Text style={styles.friendName} numberOfLines={1}>
-                        {f.id === 'me' ? 'You' : f.name.split(' ')[0]}
+                        {f.id === 'me' ? 'You' : firstName(f)}
                       </Text>
                     </Pressable>
                   ))}
@@ -270,7 +270,7 @@ export default function PlayerProfileScreen({ route, navigation }) {
               <View style={styles.privateRow}>
                 <Ionicons name="lock-closed-outline" size={15} color={colors.slate400} />
                 <Text style={styles.privateNote}>
-                  {player.name.split(' ')[0]} keeps their friends list private.
+                  {firstName(player, 'This player')} keeps their friends list private.
                 </Text>
               </View>
             )}
@@ -301,7 +301,7 @@ export default function PlayerProfileScreen({ route, navigation }) {
               <View style={styles.privateRow}>
                 <Ionicons name="lock-closed-outline" size={15} color={colors.slate400} />
                 <Text style={styles.privateNote}>
-                  {player.name.split(' ')[0]} keeps their communities private.
+                  {firstName(player, 'This player')} keeps their communities private.
                 </Text>
               </View>
             )}

@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tag, KeyboardDoneBar, DONE_BAR_ID } from '../components/ui';
 import { SportChip } from '../components/SportIcon';
 import { getPlayer } from '../lib/mockData';
-import { EMPTY_PROFILE } from '../lib/profile';
+import { EMPTY_PROFILE, firstName } from '../lib/profile';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import * as api from '../lib/api';
@@ -344,7 +344,7 @@ function CommunityHeader({ community, members, joined, onToggleJoin, onBack, onO
             <Pressable style={styles.member} onPress={() => onPressMember(m)}>
               <Image source={{ uri: m.avatar }} style={styles.memberAvatar} contentFit="cover" />
               <Text style={styles.memberName} numberOfLines={1}>
-                {m.id === 'me' ? 'You' : m.name.split(' ')[0]}
+                {m.id === 'me' ? 'You' : firstName(m)}
               </Text>
               {joined && m.id !== 'me' ? (
                 <Pressable onPress={() => onMessageMember(m)} hitSlop={6} style={styles.hitBtn}>

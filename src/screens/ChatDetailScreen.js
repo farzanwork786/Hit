@@ -25,6 +25,7 @@ import { KeyboardDoneBar, DONE_BAR_ID } from '../components/ui';
 import { RatingSummary } from '../components/SportIcon';
 import { useSport } from '../context/SportContext';
 import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
+import { firstName } from '../lib/profile';
 import { colors, fonts, spacing, radius } from '../theme';
 
 export default function ChatDetailScreen({ route, navigation }) {
@@ -61,9 +62,9 @@ export default function ChatDetailScreen({ route, navigation }) {
 
   function handleBlock() {
     setMenuOpen(false);
-    const firstName = player.name.split(' ')[0];
+    const first = firstName(player, 'this player');
     Alert.alert(
-      `Block ${firstName}?`,
+      `Block ${first}?`,
       "They won't be able to see your profile and won't appear in Browse or Requests.",
       [
         { text: 'Cancel', style: 'cancel' },

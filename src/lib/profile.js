@@ -29,6 +29,19 @@ export const EMPTY_PROFILE = {
   communitiesVisibility: 'everyone',
 };
 
+// Display name for a profile, safe when `name` is missing. Older rows (and any
+// account created before name was enforced) can have a null name, and calling
+// .split() on that crashes whichever screen renders it.
+export function displayName(person, fallback = 'Player') {
+  const n = typeof person?.name === 'string' ? person.name.trim() : '';
+  return n || fallback;
+}
+
+// Just the first name, for greetings and tight spaces like grid tiles.
+export function firstName(person, fallback = 'Player') {
+  return displayName(person, fallback).split(' ')[0];
+}
+
 // Generic visibility gate for 'everyone' | 'friends' | 'me' settings.
 // `viewerId` is the signed-in user's id (null when unknown).
 function canSee(target, viewerId, vis) {
@@ -50,4 +63,4 @@ export function canSeeCommunities(target, viewerId) {
   return canSee(target, viewerId, target?.communitiesVisibility);
 }
 
-export default { EMPTY_PROFILE, canSeeFriends, canSeeCommunities };
+export default { EMPTY_PROFILE, displayName, firstName, canSeeFriends, canSeeCommunities };

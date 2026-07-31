@@ -14,7 +14,7 @@ import SportIcon, { SportChip } from '../components/SportIcon';
 import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
-import { EMPTY_PROFILE } from '../lib/profile';
+import { EMPTY_PROFILE, displayName, firstName } from '../lib/profile';
 import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import { SPORTS, SPORT_KEYS, playsSport, ratingShort } from '../lib/ratings';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
@@ -222,7 +222,7 @@ export default function MyProfileScreen({ navigation }) {
                   </View>
                 ) : null}
                 <Text style={styles.tileName} numberOfLines={1}>
-                  {f.name.split(' ')[0]}
+                  {firstName(f)}
                 </Text>
               </Pressable>
             ))}
