@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppButton, DONE_BAR_ID } from './ui';
+import { SESSION_TYPES } from '../lib/sessionTypes';
 import { colors, fonts, spacing, radius } from '../theme';
 
 // Next 7 days as pickable chips.
@@ -54,7 +55,15 @@ function buildTimes() {
   return out;
 }
 
-export default function AskToHitSheet({ visible, playerName, defaultCourt, onClose, onSubmit }) {
+export default function AskToHitSheet({
+  visible,
+  playerName,
+  defaultCourt,
+  defaultSessionType = null,
+  mode = 'ask', // 'ask' | 'reschedule'
+  onClose,
+  onSubmit,
+}) {
   const insets = useSafeAreaInsets();
   const days = useMemo(buildDays, [visible]);
   const times = useMemo(buildTimes, []);
@@ -63,8 +72,10 @@ export default function AskToHitSheet({ visible, playerName, defaultCourt, onClo
   const [timeKey, setTimeKey] = useState(null);
   const [court, setCourt] = useState(defaultCourt || '');
   const [note, setNote] = useState('');
+  const [type, setType] = useState(defaultSessionType);
 
   const ready = Boolean(dayKey && timeKey);
+  const rescheduling = mode === 'reschedule';
 
   function submit() {
     const day = days.find((d) => d.key === dayKey);
@@ -76,6 +87,7 @@ export default function AskToHitSheet({ visible, playerName, defaultCourt, onClo
       scheduledAt: when.toISOString(),
       court: court.trim() || null,
       note: note.trim() || null,
+      sessionType: type,
     });
     // Reset so the next open starts clean.
     setDayKey(null);
@@ -90,13 +102,37 @@ export default function AskToHitSheet({ visible, playerName, defaultCourt, onClo
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
           <View style={styles.handle} />
           <View style={styles.header}>
-            <Text style={styles.title}>Ask {playerName || 'them'} to hit</Text>
+            <Text style={styles.title}>
+              {rescheduling ? 'Change the time' : `Ask ${playerName || 'them'} to hit`}
+            </Text>
             <Pressable onPress={onClose} hitSlop={10}>
               <Ionicons name="close" size={24} color={colors.slate500} />
             </Pressable>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={styles.label}>What kind of session?</Text>
+            <View style={styles.typeRow}>
+              {SESSION_TYPES.map((s) => {
+                const active = type === s.key;
+                return (
+                  <Pressable
+                    key={s.key}
+                    onPress={() => setType(active ? null : s.key)}
+                    style={[styles.typeCard, active && styles.typeCardActive]}
+                  >
+                    <Ionicons
+                      name={s.icon}
+                      size={18}
+                      color={active ? colors.blue : colors.slate500}
+                    />
+                    <Text style={[styles.typeLabel, active && { color: colors.blue }]}>{s.label}</Text>
+                    <Text style={styles.typeBlurb}>{s.blurb}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <Text style={styles.label}>Day</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {days.map((d) => (
@@ -133,7 +169,12 @@ export default function AskToHitSheet({ visible, playerName, defaultCourt, onClo
             />
 
             <View style={{ height: spacing.lg }} />
-            <AppButton title="Send request" icon="tennisball" onPress={submit} disabled={!ready} />
+            <AppButton
+              title={rescheduling ? 'Send new time' : 'Send request'}
+              icon="tennisball"
+              onPress={submit}
+              disabled={!ready}
+            />
             {!ready ? <Text style={styles.hint}>Pick a day and time to continue.</Text> : null}
             <View style={{ height: spacing.md }} />
           </ScrollView>
@@ -196,4 +237,17 @@ const styles = StyleSheet.create({
     color: colors.navy,
   },
   hint: { fontFamily: fonts.body, fontSize: 12, color: colors.slate400, textAlign: 'center', marginTop: 8 },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: 2,
+  },
+  typeCardActive: { borderColor: colors.blue, backgroundColor: colors.blueTint },
+  typeLabel: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.navy },
+  typeBlurb: { fontFamily: fonts.body, fontSize: 10.5, lineHeight: 14, color: colors.slate500 },
 });

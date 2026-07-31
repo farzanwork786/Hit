@@ -995,6 +995,7 @@ export async function proposeHit(draft) {
         scheduled_at: draft.scheduledAt ?? null,
         note: draft.note ?? null,
         court_post_id: draft.courtPostId ?? null,
+        session_type: draft.sessionType ?? null,
       })
       .select('*')
       .single();
@@ -1016,6 +1017,8 @@ export async function proposeHit(draft) {
           scheduledAt: hit.scheduled_at,
           note: hit.note,
           sport: hit.sport,
+          sessionType: hit.session_type,
+          status: hit.status,
         },
       });
     }
@@ -1049,6 +1052,54 @@ export async function respondToHit(hitId, status, { conversationId } = {}) {
       await sendMessage(conversationId, said, {
         kind: 'system',
         meta: { hitId, status },
+      });
+    }
+    return { ok: true, hit };
+  } catch (e) {
+    markUnreachable();
+    return { ok: false, error: e };
+  }
+}
+
+// Change the time, court or note on an existing hit. Plans move around, so
+// this stays available after it's been accepted. Rescheduling resets the hit
+// to 'proposed' — the other person has to confirm the new time rather than
+// silently ending up committed to something they never agreed to.
+export async function rescheduleHit(hitId, changes, { conversationId } = {}) {
+  if (!shouldTryLive()) return { ok: true, demo: true };
+  try {
+    const patch = { status: 'proposed' };
+    if (changes.scheduledAt !== undefined) patch.scheduled_at = changes.scheduledAt;
+    if (changes.court !== undefined) patch.court = changes.court;
+    if (changes.note !== undefined) patch.note = changes.note;
+    if (changes.sessionType !== undefined) patch.session_type = changes.sessionType;
+
+    const { data: hit, error } = await supabase
+      .from('scheduled_hits')
+      .update(patch)
+      .eq('id', hitId)
+      .select('*')
+      .single();
+    if (error) return { ok: false, error };
+    markReachable();
+
+    if (conversationId) {
+      await sendMessage(conversationId, `Updated: ${hitSummary({
+        court: hit.court,
+        scheduledAt: hit.scheduled_at,
+      })}`, {
+        kind: 'hit',
+        meta: {
+          hitId: hit.id,
+          court: hit.court,
+          city: hit.city,
+          scheduledAt: hit.scheduled_at,
+          note: hit.note,
+          sport: hit.sport,
+          sessionType: hit.session_type,
+          status: hit.status,
+          rescheduled: true,
+        },
       });
     }
     return { ok: true, hit };
@@ -1346,6 +1397,7 @@ export default {
   markAllNotificationsRead,
   proposeHit,
   respondToHit,
+  rescheduleHit,
   joinCourtPost,
   getCourtPostJoinCounts,
   getMyHits,

@@ -27,6 +27,7 @@ import { useSport } from '../context/SportContext';
 import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import { firstName } from '../lib/profile';
 import AskToHitSheet from '../components/AskToHitSheet';
+import { sessionType } from '../lib/sessionTypes';
 import { colors, fonts, spacing, radius } from '../theme';
 
 export default function ChatDetailScreen({ route, navigation }) {
@@ -41,6 +42,7 @@ export default function ChatDetailScreen({ route, navigation }) {
   const myUidRef = useRef(null);
   const promotedRef = useRef(false); // guards the request→chat promotion
   const [askOpen, setAskOpen] = useState(false);
+  const [rescheduling, setRescheduling] = useState(null); // hit meta being changed
 
   // Accept / decline a hit straight from its card. Updates the card in place so
   // the thread reflects the outcome immediately, then persists.
@@ -54,6 +56,21 @@ export default function ChatDetailScreen({ route, navigation }) {
       )
     );
     const res = await api.respondToHit(hitId, status, { conversationId: chatId });
+    if (res && res.ok === false) {
+      Alert.alert('Could not update', 'Please try again.');
+      return;
+    }
+    const fresh = await api.getMessages(chatId);
+    if (fresh?.length) setMessages(fresh);
+  }
+
+  // Move an existing hit to a new time. Goes back to 'proposed' so the other
+  // person confirms rather than being silently rebooked.
+  async function submitReschedule(draft) {
+    const target = rescheduling;
+    setRescheduling(null);
+    if (!target?.hitId) return;
+    const res = await api.rescheduleHit(target.hitId, draft, { conversationId: chatId });
     if (res && res.ok === false) {
       Alert.alert('Could not update', 'Please try again.');
       return;
@@ -259,7 +276,11 @@ export default function ChatDetailScreen({ route, navigation }) {
           data={messages}
           keyExtractor={(m) => m.id}
           renderItem={({ item }) => (
-            <MessageRow msg={item} onRespondToHit={respondToHit} />
+            <MessageRow
+              msg={item}
+              onRespondToHit={respondToHit}
+              onChangeHit={(meta) => setRescheduling(meta)}
+            />
           )}
           contentContainerStyle={styles.messages}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
@@ -309,6 +330,17 @@ export default function ChatDetailScreen({ route, navigation }) {
         playerName={firstName(player, 'them')}
         onClose={() => setAskOpen(false)}
         onSubmit={askToHit}
+      />
+
+      <AskToHitSheet
+        key={rescheduling?.hitId || 'reschedule'}
+        visible={Boolean(rescheduling)}
+        mode="reschedule"
+        playerName={firstName(player, 'them')}
+        defaultCourt={rescheduling?.court || ''}
+        defaultSessionType={rescheduling?.sessionType || null}
+        onClose={() => setRescheduling(null)}
+        onSubmit={submitReschedule}
       />
 
       {/* ⋯ Options sheet */}
@@ -394,9 +426,10 @@ function ChatSheetRow({ icon, label, onPress, destructive }) {
 
 // Picks how a row renders. Every interaction between two people lands in the
 // thread as one of these, so nothing happens "invisibly" elsewhere.
-function MessageRow({ msg, onRespondToHit }) {
+function MessageRow({ msg, onRespondToHit, onChangeHit }) {
   if (msg.kind === 'system') return <SystemNote msg={msg} />;
-  if (msg.kind === 'hit') return <HitCard msg={msg} onRespond={onRespondToHit} />;
+  if (msg.kind === 'hit')
+    return <HitCard msg={msg} onRespond={onRespondToHit} onChange={onChangeHit} />;
   return <Bubble msg={msg} />;
 }
 
@@ -439,10 +472,14 @@ function SystemNote({ msg }) {
 
 // The scheduling card. The person who was asked gets the buttons; the asker
 // sees the same card with its current state.
-function HitCard({ msg, onRespond }) {
+function HitCard({ msg, onRespond, onChange }) {
   const m = msg.meta || {};
   const status = m.status || 'proposed';
   const canAnswer = !msg.fromMe && status === 'proposed';
+  // Plans change. Once something is agreed, either side can still move it or
+  // call it off rather than being stuck with the original card.
+  const settled = status === 'accepted';
+  const type = sessionType(m.sessionType);
 
   const statusLabel = {
     proposed: msg.fromMe ? 'Waiting for a reply' : 'Can you make it?',
@@ -456,7 +493,14 @@ function HitCard({ msg, onRespond }) {
       <View style={styles.hitCard}>
         <View style={styles.hitHead}>
           <Ionicons name="tennisball" size={14} color={colors.blue} />
-          <Text style={styles.hitHeadText}>Ask to hit</Text>
+          <Text style={styles.hitHeadText}>
+            {m.rescheduled ? 'NEW TIME' : 'ASK TO HIT'}
+          </Text>
+          {type ? (
+            <View style={styles.hitTypeTag}>
+              <Text style={styles.hitTypeText}>{type.label}</Text>
+            </View>
+          ) : null}
         </View>
 
         {m.scheduledAt ? (
@@ -472,7 +516,7 @@ function HitCard({ msg, onRespond }) {
         ) : null}
         {m.note ? <Text style={styles.hitNote}>{m.note}</Text> : null}
 
-        <Text style={styles.hitStatus}>{statusLabel}</Text>
+        <Text style={[styles.hitStatus, settled && { color: colors.green }]}>{statusLabel}</Text>
 
         {canAnswer ? (
           <View style={styles.hitActions}>
@@ -486,7 +530,21 @@ function HitCard({ msg, onRespond }) {
               style={[styles.hitBtn, styles.hitAccept]}
               onPress={() => onRespond?.(m.hitId, 'accepted')}
             >
+              <Ionicons name="checkmark" size={18} color={colors.white} />
               <Text style={styles.hitAcceptText}>I'm in</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {settled ? (
+          <View style={styles.hitSecondaryRow}>
+            <Pressable style={styles.hitSecondaryBtn} onPress={() => onChange?.(m)}>
+              <Ionicons name="calendar-outline" size={14} color={colors.blue} />
+              <Text style={styles.hitSecondaryText}>Change time</Text>
+            </Pressable>
+            <Pressable style={styles.hitSecondaryBtn} onPress={() => onRespond?.(m.hitId, 'cancelled')}>
+              <Ionicons name="close-circle-outline" size={14} color={colors.red} />
+              <Text style={[styles.hitSecondaryText, { color: colors.red }]}>Cancel</Text>
             </Pressable>
           </View>
         ) : null}
@@ -585,11 +643,37 @@ const styles = StyleSheet.create({
   hitNote: { fontFamily: fonts.body, fontSize: 13, color: colors.slate500, marginTop: 6, lineHeight: 18 },
   hitStatus: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.slate400, marginTop: 8 },
   hitActions: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
-  hitBtn: { flex: 1, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  hitDecline: { backgroundColor: colors.slate100 },
-  hitDeclineText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.slate600 },
-  hitAccept: { backgroundColor: colors.blue },
-  hitAcceptText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.white },
+  hitBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 5,
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hitDecline: { backgroundColor: colors.slate100, flex: 0.85 },
+  hitDeclineText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.slate600 },
+  hitAccept: { backgroundColor: colors.blue, flex: 1.15 },
+  hitAcceptText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.white },
+  hitTypeTag: {
+    marginLeft: 'auto',
+    backgroundColor: colors.slate100,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  hitTypeText: { fontFamily: fonts.bodyMedium, fontSize: 10.5, color: colors.slate600 },
+  hitSecondaryRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  hitSecondaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  hitSecondaryText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.blue },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

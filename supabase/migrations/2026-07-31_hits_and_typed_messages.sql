@@ -13,6 +13,25 @@ alter table public.scheduled_hits
   add column if not exists court_post_id uuid
   references public.court_posts (id) on delete set null;
 
+alter table public.court_posts
+  add column if not exists session_type text;
+
+alter table public.court_posts
+  add column if not exists spots_needed int;
+
+alter table public.scheduled_hits
+  add column if not exists session_type text;
+
+alter table public.court_posts drop constraint if exists court_posts_session_type_check;
+alter table public.court_posts
+  add constraint court_posts_session_type_check
+  check (session_type in ('rally', 'practice', 'match')) not valid;
+
+alter table public.scheduled_hits drop constraint if exists scheduled_hits_session_type_check;
+alter table public.scheduled_hits
+  add constraint scheduled_hits_session_type_check
+  check (session_type in ('rally', 'practice', 'match')) not valid;
+
 create index if not exists idx_scheduled_hits_proposer
   on public.scheduled_hits (proposer_id, scheduled_at);
 
