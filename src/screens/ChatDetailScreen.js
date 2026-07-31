@@ -20,7 +20,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
 import * as api from '../lib/api';
-import { notifyMessage } from '../lib/notifications';
+import { notifyMessage, scheduleHitReminder, cancelHitReminder } from '../lib/notifications';
 import { KeyboardDoneBar, DONE_BAR_ID } from '../components/ui';
 import { RatingSummary } from '../components/SportIcon';
 import { useSport } from '../context/SportContext';
@@ -60,6 +60,17 @@ export default function ChatDetailScreen({ route, navigation }) {
       Alert.alert('Could not update', 'Please try again.');
       return;
     }
+    // Remind me two hours before, and drop the reminder if it's called off.
+    if (status === 'accepted' && res?.hit) {
+      scheduleHitReminder({
+        id: res.hit.id,
+        scheduledAt: res.hit.scheduled_at,
+        court: res.hit.court,
+        playerName: firstName(player, null),
+      });
+    } else {
+      cancelHitReminder(hitId);
+    }
     const fresh = await api.getMessages(chatId);
     if (fresh?.length) setMessages(fresh);
   }
@@ -75,6 +86,9 @@ export default function ChatDetailScreen({ route, navigation }) {
       Alert.alert('Could not update', 'Please try again.');
       return;
     }
+    // The old time is no longer valid; a new reminder is set once the other
+    // person confirms the new one.
+    cancelHitReminder(target.hitId);
     const fresh = await api.getMessages(chatId);
     if (fresh?.length) setMessages(fresh);
   }

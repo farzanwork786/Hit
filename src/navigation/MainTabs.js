@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
+import FirstRunGuide from '../components/FirstRunGuide';
 import BrowseScreen from '../screens/BrowseScreen';
 import CourtBoardScreen from '../screens/CourtBoardScreen';
 import CommunitiesScreen from '../screens/CommunitiesScreen';
@@ -23,6 +24,8 @@ const ICONS = {
 
 export default function MainTabs() {
   return (
+    <>
+    <FirstRunGuide />
     <Tab.Navigator
       initialRouteName="CourtBoard"
       screenOptions={({ route }) => ({
@@ -49,5 +52,6 @@ export default function MainTabs() {
       <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages' }} />
       <Tab.Screen name="MyProfile" component={MyProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
+    </>
   );
 }

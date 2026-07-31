@@ -146,3 +146,51 @@ export function notifyCommunityPost(communityName, authorName) {
     { type: NOTIF_TYPES.COMMUNITY_POST }
   );
 }
+
+// ---------------------------------------------------------------------------
+// Hit reminders.
+//
+// Unlike the helpers above, these are genuinely local: the reminder is for YOUR
+// own device about a hit you agreed to, so there's nothing for the server to
+// deliver. Scheduling on-device also means it still fires with no connection.
+// ---------------------------------------------------------------------------
+
+const REMINDER_LEAD_MS = 2 * 60 * 60 * 1000; // 2 hours before
+
+// Schedule (or re-schedule) the reminder for a hit. Safe to call repeatedly —
+// the previous reminder for the same hit is cancelled first, so changing the
+// time doesn't leave a stale alert behind.
+export async function scheduleHitReminder(hit) {
+  if (!hit?.id || !hit.scheduledAt) return;
+  await cancelHitReminder(hit.id);
+
+  const start = new Date(hit.scheduledAt).getTime();
+  if (Number.isNaN(start)) return;
+  const fireAt = start - REMINDER_LEAD_MS;
+  // Nothing to schedule if that moment has already passed.
+  if (fireAt <= Date.now()) return;
+
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `hit-${hit.id}`,
+      content: {
+        title: hit.playerName ? `Hit with ${hit.playerName}` : 'Upcoming hit',
+        body: [hit.court, 'starts in 2 hours'].filter(Boolean).join(' — '),
+        data: { type: 'hit_reminder', hitId: hit.id },
+        sound: true,
+      },
+      trigger: { date: new Date(fireAt) },
+    });
+  } catch (_) {
+    // Permission denied or scheduling unavailable — not worth interrupting.
+  }
+}
+
+export async function cancelHitReminder(hitId) {
+  if (!hitId) return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(`hit-${hitId}`);
+  } catch (_) {
+    // Nothing scheduled under that id.
+  }
+}
