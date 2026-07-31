@@ -7,22 +7,14 @@
 
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { SPORT_KEYS } from '../lib/ratings';
+import { sportKeys } from '../lib/profile';
 
 const SportContext = createContext(null);
-
-// Profiles store sports as an object (players) or array of keys (communities).
-function sportsFromProfile(profile) {
-  const src = profile?.sports;
-  if (Array.isArray(src)) return SPORT_KEYS.filter((s) => src.includes(s));
-  if (src && typeof src === 'object') return SPORT_KEYS.filter((s) => src[s]);
-  return [];
-}
 
 export function SportProvider({ children }) {
   const { profile } = useAuth();
   const mySports = useMemo(() => {
-    const list = sportsFromProfile(profile);
+    const list = sportKeys(profile);
     return list.length ? list : ['tennis'];
   }, [profile]);
 

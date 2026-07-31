@@ -26,7 +26,7 @@ import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
 import { AVAILABILITY_OPTIONS } from '../lib/mockData';
-import { EMPTY_PROFILE } from '../lib/profile';
+import { EMPTY_PROFILE, sportKeys } from '../lib/profile';
 import { SPORTS, SPORT_KEYS, levelDescription } from '../lib/ratings';
 import { colors, fonts, spacing, radius } from '../theme';
 
@@ -55,19 +55,24 @@ export default function EditProfileScreen({ navigation }) {
     cover: user.cover || '',
     photos: Array.isArray(user.photos) ? [...user.photos] : [],
     availability: Array.isArray(user.availability) ? [...user.availability] : [],
-    // deep-copy sports so edits don't mutate the live profile until save
-    sports: JSON.parse(JSON.stringify(user.sports || (isCommunity ? [] : {}))),
+    // Deep-copy sports so edits don't mutate the live profile until save.
+    // A community's sports must be normalised to an array of keys: it comes
+    // back from the profile as an object, and the community branch below calls
+    // array methods on it.
+    sports: isCommunity
+      ? sportKeys(user)
+      : JSON.parse(JSON.stringify(user.sports || {})),
   });
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   // Player: sports is an object keyed by sport. Community: array of sport keys.
   const playsSport = (s) =>
-    isCommunity ? (form.sports || []).includes(s) : Boolean(form.sports[s]);
+    isCommunity ? sportKeys({ sports: form.sports }).includes(s) : Boolean(form.sports?.[s]);
 
   function toggleSport(s) {
     if (isCommunity) {
-      const arr = form.sports || [];
+      const arr = sportKeys({ sports: form.sports });
       set({ sports: arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s] });
     } else {
       const next = { ...form.sports };

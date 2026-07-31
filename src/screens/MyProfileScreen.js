@@ -14,7 +14,7 @@ import SportIcon, { SportChip } from '../components/SportIcon';
 import { pickImage } from '../lib/imagePicker';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../lib/api';
-import { EMPTY_PROFILE, displayName, firstName } from '../lib/profile';
+import { EMPTY_PROFILE, displayName, firstName, sportKeys } from '../lib/profile';
 import { APP_STORE_URL, withAppLink } from '../lib/appLinks';
 import { SPORTS, SPORT_KEYS, playsSport, ratingShort } from '../lib/ratings';
 import { colors, fonts, spacing, radius, shadow } from '../theme';
@@ -303,7 +303,7 @@ function CommunityAccountView({ user, navigation, onSignOut, onChangeCover }) {
 
         <View style={styles.communityBody}>
           <View style={styles.tagRow}>
-            {(user.sports || []).map((s) => (
+            {sportKeys(user).map((s) => (
               <SportChip key={s} sport={s} tone="blue" />
             ))}
           </View>

@@ -205,7 +205,8 @@ export default function ChatDetailScreen({ route, navigation }) {
           <View style={styles.requestBanner}>
             <Ionicons name="tennisball" size={16} color={colors.blue} />
             <Text style={styles.requestBannerText}>
-              Send {player.name} a message to ask them to play.
+              You asked {firstName(player, 'them')} to play. It's waiting in their
+              Requests — send a message so they know what you have in mind.
             </Text>
           </View>
         ) : null}

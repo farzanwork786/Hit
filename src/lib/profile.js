@@ -4,6 +4,8 @@
 // fall back to when a real profile hasn't loaded yet, so it must never be able
 // to surface demo people, photos or friends in a live app.
 
+import { SPORT_KEYS } from './ratings';
+
 // A blank profile with every field a screen might read already present, so
 // components can render an empty state instead of crashing (or showing a
 // stand-in person) while the real profile loads.
@@ -28,6 +30,17 @@ export const EMPTY_PROFILE = {
   friendsVisibility: 'everyone',
   communitiesVisibility: 'everyone',
 };
+
+// Sports are stored in two different shapes: players get an object keyed by
+// sport ({ tennis: { rating } }), communities get an array of keys
+// (['tennis']). Calling .map/.includes on the wrong one throws, so always go
+// through this to get a plain array of sport keys.
+export function sportKeys(profile) {
+  const src = profile?.sports;
+  if (Array.isArray(src)) return SPORT_KEYS.filter((s) => src.includes(s));
+  if (src && typeof src === 'object') return SPORT_KEYS.filter((s) => src[s]);
+  return [];
+}
 
 // Display name for a profile, safe when `name` is missing. Older rows (and any
 // account created before name was enforced) can have a null name, and calling
@@ -63,4 +76,11 @@ export function canSeeCommunities(target, viewerId) {
   return canSee(target, viewerId, target?.communitiesVisibility);
 }
 
-export default { EMPTY_PROFILE, displayName, firstName, canSeeFriends, canSeeCommunities };
+export default {
+  EMPTY_PROFILE,
+  sportKeys,
+  displayName,
+  firstName,
+  canSeeFriends,
+  canSeeCommunities,
+};

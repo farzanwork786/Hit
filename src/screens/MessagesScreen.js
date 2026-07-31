@@ -110,7 +110,13 @@ export default function MessagesScreen({ navigation }) {
             <ChatRow chat={item} onPress={() => navigation.navigate('ChatDetail', { player: item.player, chatId: item.id, sport: item.sport })} />
           )}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState icon="chatbubbles-outline" title="No chats yet" subtitle="Start a conversation from a player's profile." />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="chatbubbles-outline"
+              title="No chats yet"
+              subtitle="Find someone in Browse and tap Ask to play. Once they reply, your conversation shows up here."
+            />
+          }
         />
       ) : (
         <FlatList
@@ -127,7 +133,13 @@ export default function MessagesScreen({ navigation }) {
             />
           )}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState icon="mail-outline" title="No requests" subtitle="New play requests will show up here." />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="mail-outline"
+              title="No requests"
+              subtitle="When someone asks you to play, it lands here first. Accept or reply and they move into Chats."
+            />
+          }
         />
       )}
     </SafeAreaView>
