@@ -9,6 +9,9 @@
 -- uses, enables PostGIS for distance search, turns on Row Level Security with
 -- per-user policies, wires triggers (profile bootstrap, friendships on accept,
 -- notifications, denormalised counts) and creates the media storage bucket.
+--
+-- After this file, run every file in supabase/migrations/ in date order. Later
+-- features and the safety rules (blocking, privacy, guards) live there.
 -- ============================================================================
 
 -- ============================================================

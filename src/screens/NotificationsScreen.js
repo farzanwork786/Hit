@@ -16,6 +16,7 @@ const ICONS = {
   match: { name: 'checkmark-circle', tone: colors.green, bg: colors.greenLight },
   like: { name: 'heart', tone: colors.red, bg: colors.redLight },
   community: { name: 'people', tone: colors.blue, bg: colors.blueTint },
+  hit: { name: 'calendar', tone: colors.green, bg: colors.greenLight },
   system: { name: 'shield-checkmark', tone: colors.navy, bg: colors.slate100 },
 };
 

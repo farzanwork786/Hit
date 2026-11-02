@@ -8,8 +8,8 @@
 import { Platform } from 'react-native';
 
 export const TABS = [
-  { name: 'CourtBoard', title: 'Court Board', icon: 'megaphone', iconOutline: 'megaphone-outline' },
   { name: 'Browse', title: 'Browse', icon: 'tennisball', iconOutline: 'tennisball-outline' },
+  { name: 'CourtBoard', title: 'Court Board', icon: 'megaphone', iconOutline: 'megaphone-outline' },
   { name: 'Communities', title: 'Communities', icon: 'people', iconOutline: 'people-outline' },
   { name: 'Messages', title: 'Messages', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
   { name: 'MyProfile', title: 'Profile', icon: 'person', iconOutline: 'person-outline' },

@@ -37,6 +37,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const DEFAULT_FILTERS = { distance: 25, rangeId: 'all' };
+const MAX_DISTANCE = 50; // top of the distance slider
 
 export default function BrowseScreen({ navigation }) {
   const { sport } = useSport();
@@ -106,6 +107,16 @@ export default function BrowseScreen({ navigation }) {
       return true;
     });
   }, [rawPlayers, filters.rangeId, sport]);
+
+  function inviteFriend() {
+    Share.share({
+      message: withAppLink(
+        "I'm on Hit — the app for finding tennis & pickleball players nearby. Come join me!"
+      ),
+      title: 'Hit app',
+      url: APP_STORE_URL,
+    });
+  }
 
   const activeCount =
     (filters.distance !== DEFAULT_FILTERS.distance ? 1 : 0) +
@@ -199,6 +210,18 @@ export default function BrowseScreen({ navigation }) {
               action="Choose location"
               onAction={() => setLocOpen(true)}
             />
+          ) : filters.rangeId === 'all' && filters.distance < MAX_DISTANCE ? (
+            // Nobody inside the radius. Hit is still sparse in most areas, so
+            // the most useful next step is looking further out, then inviting.
+            <EmptyState
+              icon="people-outline"
+              title={`Nobody within ${Math.round(filters.distance)} mi yet`}
+              subtitle={`Hit is new in your area. Look further out, or invite the people you already play ${SPORTS[sport].label.toLowerCase()} with.`}
+              action={`Search up to ${MAX_DISTANCE} mi`}
+              onAction={() => setFilters((f) => ({ ...f, distance: MAX_DISTANCE }))}
+              secondaryAction="Invite a friend"
+              onSecondaryAction={inviteFriend}
+            />
           ) : activeCount > 0 ? (
             <EmptyState
               icon="options-outline"
@@ -213,15 +236,7 @@ export default function BrowseScreen({ navigation }) {
               title="No players near you yet"
               subtitle={`Hit is growing fast! Invite a friend and get your first ${SPORTS[sport].label.toLowerCase()} match going.`}
               action="Invite a friend"
-              onAction={() =>
-                Share.share({
-                  message: withAppLink(
-                    "I'm on Hit — the app for finding tennis & pickleball players nearby. Come join me!"
-                  ),
-                  title: 'Hit app',
-                  url: APP_STORE_URL,
-                })
-              }
+              onAction={inviteFriend}
             />
           )
         }
@@ -249,7 +264,7 @@ function FilterPanel({ sport, filters, setFilters, onReset, onClose, onOpenGuide
         <RangeRow label="Max distance" value={`${Math.round(filters.distance)} mi`}>
           <Slider
             minimumValue={1}
-            maximumValue={50}
+            maximumValue={MAX_DISTANCE}
             step={1}
             value={filters.distance}
             onValueChange={(v) => set({ distance: v })}

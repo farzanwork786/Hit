@@ -150,23 +150,24 @@ async function write(live) {
 // ---------------------------------------------------------------------------
 // Mapping: DB rows <-> app shapes
 // ---------------------------------------------------------------------------
-// Public columns only. email, phone and lat/lng are private: the database
-// refuses them for other users, and the owner reads theirs via
+// Public columns only. email, phone, lat/lng and the real age are private:
+// the database refuses them for other users (age_public is null when the
+// player hides their age), and the owner reads theirs via
 // get_my_private_profile (see getProfile).
 const PROFILE_COLS =
-  'id,name,username,age,avatar,cover,photos,city,hand,bio,availability,is_community,community_type,verified,friends_visibility,communities_visibility,show_in_browse';
+  'id,name,username,age_public,avatar,cover,photos,city,hand,bio,availability,is_community,community_type,verified,friends_visibility,communities_visibility,show_in_browse';
 
-// The signed-in user's own email/phone/lat/lng, or {} if unavailable.
-async function getMyPrivateFields(uid) {
+// The signed-in user's own email/phone/lat/lng/age, or {} if unavailable.
+async function getMyPrivateFields() {
   const { data, error } = await supabase.rpc('get_my_private_profile');
-  if (!error) return (Array.isArray(data) ? data[0] : data) || {};
-  // Migration not applied yet: the columns are still directly readable.
-  const { data: row } = await supabase
-    .from('profiles')
-    .select('email,phone,lat,lng')
-    .eq('id', uid)
-    .maybeSingle();
-  return row || {};
+  if (error) return {};
+  return (Array.isArray(data) ? data[0] : data) || {};
+}
+
+// The database's own wording for a refused action (block, privacy setting),
+// or null for anything technical that shouldn't be shown to a player.
+export function refusalMessage(error) {
+  return error?.code === 'P0001' && error.message ? error.message : null;
 }
 
 function sportsFromRows(rows = []) {
@@ -187,7 +188,7 @@ function dbProfileToApp(row, sportsRows) {
     username: row.username,
     email: row.email,
     phone: row.phone,
-    age: row.age,
+    age: row.age ?? row.age_public ?? null,
     avatar: row.avatar,
     cover: row.cover,
     photos: row.photos || [],
@@ -253,7 +254,7 @@ export async function getProfile(id) {
     const [{ data: row, error }, { data: sportsRows }, privateFields] = await Promise.all([
       supabase.from('profiles').select(PROFILE_COLS).eq('id', id).single(),
       supabase.from('player_sports').select('sport,rating,style').eq('user_id', id),
-      id === uid ? getMyPrivateFields(uid) : Promise.resolve({}),
+      id === uid ? getMyPrivateFields() : Promise.resolve({}),
     ]);
     if (error) {
       if (isNetworkError(error)) markUnreachable();
@@ -635,6 +636,8 @@ export function subscribeMessages(conversationId, onInsert) {
 // ===========================================================================
 // COURT BOARD
 // ===========================================================================
+const COURT_POST_MAX_AGE_DAYS = 14;
+
 export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance = 50 }) {
   const origin = lat != null && lng != null ? { lat, lng } : null;
   const uid = await currentUid();
@@ -646,6 +649,9 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
 
   if (!shouldTryLive()) return demoOnly(mockData);
   try {
+    // Posts older than two weeks are stale ("Saturday 9am" has long passed),
+    // so the board only shows recent ones.
+    const since = new Date(Date.now() - COURT_POST_MAX_AGE_DAYS * 86400000).toISOString();
     const { data, error } = await supabase
       .from('court_posts')
       // The FK name is REQUIRED here. profiles is reachable from court_posts two
@@ -654,6 +660,7 @@ export async function getCourtPosts({ sport, lat = null, lng = null, maxDistance
       // query (PGRST201), which silently emptied the entire Court Board.
       .select('*,author:profiles!court_posts_author_id_fkey(' + PROFILE_COLS + ')')
       .eq('sport', sport)
+      .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(100);
     if (error) {
@@ -1144,10 +1151,9 @@ export async function joinCourtPost(post, message = "I'm in") {
       return { ok: false, error: new Error('Cannot join your own post') };
     }
 
-    const conv = await getOrCreateConversation(post.authorId, post.sport ?? null);
-    const conversationId = conv?.id ?? null;
-
-    const { data: hit } = await supabase
+    // The hit goes first: it's what lets you open a chat with an author who
+    // only takes messages from people they've connected with.
+    const { data: hit, error } = await supabase
       .from('scheduled_hits')
       .insert({
         proposer_id: post.authorId,
@@ -1161,6 +1167,11 @@ export async function joinCourtPost(post, message = "I'm in") {
       })
       .select('*')
       .single();
+    if (error) return { ok: false, error };
+    markReachable();
+
+    const conv = await getOrCreateConversation(post.authorId, post.sport ?? null);
+    const conversationId = conv?.id ?? null;
 
     if (conversationId) {
       await sendMessage(conversationId, message, {

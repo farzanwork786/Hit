@@ -27,7 +27,7 @@ export default function MainTabs() {
     <>
     <FirstRunGuide />
     <Tab.Navigator
-      initialRouteName="CourtBoard"
+      initialRouteName="Browse"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.blue,

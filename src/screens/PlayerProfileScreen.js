@@ -150,8 +150,12 @@ export default function PlayerProfileScreen({ route, navigation }) {
   }
 
   async function sendRequest() {
+    const res = await api.sendMatchRequest(player.id, `Hey ${firstName(player, 'there')}! Want to hit sometime?`, sport);
+    if (res?.ok === false) {
+      Alert.alert('Request not sent', api.refusalMessage(res.error) || 'Please try again.');
+      return;
+    }
     notifyMatchRequest({ id: player.id, name: 'You' });
-    await api.sendMatchRequest(player.id, `Hey ${firstName(player, 'there')}! Want to hit sometime?`, sport);
     // Deliberately do NOT create a conversation here. It's created lazily when
     // the first message is actually sent, so the recipient sees this as a single
     // play request (Requests tab) rather than appearing in both Requests and

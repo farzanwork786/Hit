@@ -38,14 +38,14 @@ const INVITE_MESSAGE =
 
 const STEPS = [
   {
-    tab: 'CourtBoard',
+    tab: 'Browse',
     title: 'Start here',
-    body: "People near you post when they're looking to play. Tap I'm in on one and you're on the list — no back-and-forth needed.",
+    body: 'Find people around your level nearby. Open a profile and tap Ask to Hit to propose a day.',
   },
   {
-    tab: 'Browse',
-    title: 'Or pick a player',
-    body: 'Find people around your level nearby. Open a profile and tap Ask to Hit to propose a day.',
+    tab: 'CourtBoard',
+    title: 'Or jump into a session',
+    body: "People near you post when they're looking to play. Tap I'm in on one and you're on the list — no back-and-forth needed.",
   },
   {
     tab: 'Messages',

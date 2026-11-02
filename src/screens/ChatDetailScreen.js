@@ -103,7 +103,7 @@ export default function ChatDetailScreen({ route, navigation }) {
       conversationId: chatId,
     });
     if (res && res.ok === false) {
-      Alert.alert('Could not send', 'Please try again.');
+      Alert.alert('Could not send', api.refusalMessage(res.error) || 'Please try again.');
       return;
     }
     if (!chatId && res?.conversationId) setChatId(res.conversationId);
@@ -230,14 +230,28 @@ export default function ChatDetailScreen({ route, navigation }) {
 
     // Lazily create the conversation when replying to a brand-new request.
     let cid = chatId;
+    let refused = null;
     if (!cid) {
       const conv = await api.getOrCreateConversation(player.id, sport);
       if (conv?.id) {
         cid = conv.id;
         setChatId(cid);
+      } else if (conv?.ok === false) {
+        refused = api.refusalMessage(conv.error);
       }
     }
-    if (cid) await api.sendMessage(cid, body);
+    if (cid) {
+      const res = await api.sendMessage(cid, body);
+      if (res?.ok === false) refused = api.refusalMessage(res.error) || 'Your message wasn’t sent. Please try again.';
+    }
+    if (refused) {
+      // Take the bubble back out so the thread doesn't show a message that
+      // never reached the other player.
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setText(body);
+      Alert.alert('Message not sent', refused);
+      return;
+    }
 
     // Replying counts as accepting: if this person had a pending request out to
     // us, promote it so the thread moves from Requests into Chats. Runs once

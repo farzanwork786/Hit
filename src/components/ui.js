@@ -207,7 +207,7 @@ export function IconButton({ name, onPress, size = 20, color = colors.navy, bg =
 }
 
 // --- Empty state --------------------------------------------------------
-export function EmptyState({ icon = 'tennisball-outline', title, subtitle, action, onAction }) {
+export function EmptyState({ icon = 'tennisball-outline', title, subtitle, action, onAction, secondaryAction, onSecondaryAction }) {
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
@@ -218,6 +218,11 @@ export function EmptyState({ icon = 'tennisball-outline', title, subtitle, actio
       {action ? (
         <Pressable onPress={onAction} style={styles.emptyAction}>
           <Text style={styles.emptyActionText}>{action}</Text>
+        </Pressable>
+      ) : null}
+      {secondaryAction ? (
+        <Pressable onPress={onSecondaryAction} hitSlop={8} style={styles.emptySecondary}>
+          <Text style={styles.emptySecondaryText}>{secondaryAction}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -332,6 +337,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyActionText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.white },
+  emptySecondary: { marginTop: spacing.md, paddingVertical: 6 },
+  emptySecondaryText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.blue },
 });
 
 export default {

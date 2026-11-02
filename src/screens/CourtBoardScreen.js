@@ -136,7 +136,7 @@ export default function CourtBoardScreen({ navigation }) {
         return next;
       });
       setJoinCounts((prev) => ({ ...prev, [post.id]: Math.max((prev[post.id] || 1) - 1, 0) }));
-      Alert.alert('Could not join', 'Please try again.');
+      Alert.alert('Could not join', api.refusalMessage(res.error) || 'Please try again.');
       return;
     }
     notifyCourtBoardReply(me);
@@ -152,6 +152,10 @@ export default function CourtBoardScreen({ navigation }) {
     if (!post?.author || post.author.id === myId) return;
     const postSport = post.sport || sport;
     const conv = await api.getOrCreateConversation(post.author.id, postSport);
+    if (conv && conv.ok === false && api.refusalMessage(conv.error)) {
+      Alert.alert("Can't message yet", api.refusalMessage(conv.error));
+      return;
+    }
     navigation.navigate('ChatDetail', {
       player: post.author,
       chatId: conv?.id || undefined,
