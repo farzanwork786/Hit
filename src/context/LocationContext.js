@@ -105,14 +105,18 @@ export function LocationProvider({ children }) {
   const persistCoordsToProfile = useCallback(
     (coords, label) => {
       if (!coords || !isAuthenticated || !updateProfile) return;
+      // The profile only keeps ~1 km precision (the DB rounds to 2 decimals
+      // for privacy), so round here too and compare like with like.
+      const lat = Math.round(coords.lat * 100) / 100;
+      const lng = Math.round(coords.lng * 100) / 100;
       // Skip a redundant write if nothing meaningful changed.
       const sameCoords =
         profile?.lat != null &&
         profile?.lng != null &&
-        Math.abs(profile.lat - coords.lat) < 0.0005 &&
-        Math.abs(profile.lng - coords.lng) < 0.0005;
+        Math.abs(profile.lat - lat) < 0.0005 &&
+        Math.abs(profile.lng - lng) < 0.0005;
       if (sameCoords && profile?.city) return;
-      const patch = { lat: coords.lat, lng: coords.lng };
+      const patch = { lat, lng };
       if (label && !profile?.city) patch.city = label;
       updateProfile(patch);
     },

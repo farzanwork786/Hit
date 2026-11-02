@@ -57,11 +57,14 @@ create table if not exists public.profiles (
   updated_at             timestamptz default now()
 );
 
--- Keep the PostGIS point in sync with lat/lng on write.
+-- Keep the PostGIS point in sync with lat/lng on write. Coordinates are
+-- rounded to 2 decimals (~1 km) so distance search can't pinpoint a home.
 create or replace function public.profiles_sync_location()
 returns trigger language plpgsql as $$
 begin
   if new.lat is not null and new.lng is not null then
+    new.lat = round(new.lat::numeric, 2)::double precision;
+    new.lng = round(new.lng::numeric, 2)::double precision;
     new.location = extensions.st_setsrid(extensions.st_makepoint(new.lng, new.lat), 4326)::extensions.geography;
   end if;
   return new;
@@ -216,10 +219,13 @@ create table if not exists public.court_posts (
 create index if not exists idx_court_posts_sport on public.court_posts (sport, created_at desc);
 create index if not exists idx_court_posts_location on public.court_posts using gist (location);
 
+-- Posts carry the poster's own location: round to ~1 km like profiles.
 create or replace function public.court_posts_sync_location()
 returns trigger language plpgsql as $$
 begin
   if new.lat is not null and new.lng is not null then
+    new.lat = round(new.lat::numeric, 2)::double precision;
+    new.lng = round(new.lng::numeric, 2)::double precision;
     new.location = extensions.st_setsrid(extensions.st_makepoint(new.lng, new.lat), 4326)::extensions.geography;
   end if;
   return new;
@@ -575,6 +581,25 @@ create policy profiles_insert on public.profiles for insert
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update
   to authenticated using (id = auth.uid()) with check (id = auth.uid());
+
+-- Private columns (email, phone, lat, lng, location) are not readable through
+-- the API by anyone; the owner reads theirs via get_my_private_profile().
+-- A column added to profiles later must be added here to be readable.
+revoke select on public.profiles from anon, authenticated;
+grant select (
+  id, name, username, age, avatar, cover, photos, city, hand, bio,
+  availability, is_community, community_type, verified,
+  friends_visibility, communities_visibility, show_in_browse,
+  created_at, updated_at
+) on public.profiles to authenticated;
+
+create or replace function public.get_my_private_profile()
+returns table (email text, phone text, lat double precision, lng double precision)
+language sql stable security definer set search_path = public as $$
+  select p.email, p.phone, p.lat, p.lng from public.profiles p where p.id = auth.uid();
+$$;
+revoke all on function public.get_my_private_profile() from public, anon;
+grant execute on function public.get_my_private_profile() to authenticated;
 
 -- ---- player_sports ----
 drop policy if exists ps_select on public.player_sports;

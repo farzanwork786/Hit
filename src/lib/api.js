@@ -150,8 +150,24 @@ async function write(live) {
 // ---------------------------------------------------------------------------
 // Mapping: DB rows <-> app shapes
 // ---------------------------------------------------------------------------
+// Public columns only. email, phone and lat/lng are private: the database
+// refuses them for other users, and the owner reads theirs via
+// get_my_private_profile (see getProfile).
 const PROFILE_COLS =
-  'id,name,username,email,phone,age,avatar,cover,photos,city,lat,lng,hand,bio,availability,is_community,community_type,verified,friends_visibility,communities_visibility,show_in_browse';
+  'id,name,username,age,avatar,cover,photos,city,hand,bio,availability,is_community,community_type,verified,friends_visibility,communities_visibility,show_in_browse';
+
+// The signed-in user's own email/phone/lat/lng, or {} if unavailable.
+async function getMyPrivateFields(uid) {
+  const { data, error } = await supabase.rpc('get_my_private_profile');
+  if (!error) return (Array.isArray(data) ? data[0] : data) || {};
+  // Migration not applied yet: the columns are still directly readable.
+  const { data: row } = await supabase
+    .from('profiles')
+    .select('email,phone,lat,lng')
+    .eq('id', uid)
+    .maybeSingle();
+  return row || {};
+}
 
 function sportsFromRows(rows = []) {
   const out = {};
@@ -233,16 +249,18 @@ function appSportsToRows(userId, sportsObj = {}) {
 export async function getProfile(id) {
   if (!shouldTryLive()) return demoOnly(() => mock.getPlayer(id), null);
   try {
-    const [{ data: row, error }, { data: sportsRows }] = await Promise.all([
+    const uid = await currentUid();
+    const [{ data: row, error }, { data: sportsRows }, privateFields] = await Promise.all([
       supabase.from('profiles').select(PROFILE_COLS).eq('id', id).single(),
       supabase.from('player_sports').select('sport,rating,style').eq('user_id', id),
+      id === uid ? getMyPrivateFields(uid) : Promise.resolve({}),
     ]);
     if (error) {
       if (isNetworkError(error)) markUnreachable();
       return demoOnly(() => mock.getPlayer(id), null);
     }
     markReachable();
-    return dbProfileToApp(row, sportsRows);
+    return dbProfileToApp({ ...row, ...privateFields }, sportsRows);
   } catch (e) {
     markUnreachable();
     return demoOnly(() => mock.getPlayer(id), null);
