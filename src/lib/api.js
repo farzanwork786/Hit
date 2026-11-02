@@ -1289,6 +1289,14 @@ export async function getBlockedIds() {
 export async function deleteMyAccount() {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   try {
+    // Photos first, through the Storage API: Supabase rejects SQL deletes on
+    // storage.objects, so the server function can't clear them itself.
+    const uid = await currentUid();
+    if (uid) {
+      const { data: files } = await supabase.storage.from('media').list(uid, { limit: 1000 });
+      const paths = (files || []).map((f) => `${uid}/${f.name}`);
+      if (paths.length) await supabase.storage.from('media').remove(paths);
+    }
     const { error } = await supabase.rpc('delete_my_account');
     if (error) return { ok: false, error };
     return { ok: true };
