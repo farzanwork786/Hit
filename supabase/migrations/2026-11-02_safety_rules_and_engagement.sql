@@ -182,23 +182,9 @@ update public.profiles p
  where us.user_id = p.id
    and p.hide_age is distinct from coalesce((us.privacy ->> 'hideAge')::boolean, false);
 
--- Readable columns: the public set, with age replaced by age_public.
-revoke select on public.profiles from anon, authenticated;
-grant select (
-  id, name, username, age_public, avatar, cover, photos, city, hand, bio,
-  availability, is_community, community_type, verified,
-  friends_visibility, communities_visibility, show_in_browse,
-  created_at, updated_at
-) on public.profiles to authenticated;
-
-drop function if exists public.get_my_private_profile();
-create function public.get_my_private_profile()
-returns table (email text, phone text, lat double precision, lng double precision, age int)
-language sql stable security definer set search_path = public as $$
-  select p.email, p.phone, p.lat, p.lng, p.age from public.profiles p where p.id = auth.uid();
-$$;
-revoke all on function public.get_my_private_profile() from public, anon;
-grant execute on function public.get_my_private_profile() to authenticated;
+-- The new app reads age_public for other players. The raw age column stays
+-- readable until supabase/pending/lock_profile_columns.sql runs, because app
+-- builds already in people's hands still select it.
 
 -- Browse respects profileVisibility, hideAge and hideDistance.
 create or replace function public.browse_players(

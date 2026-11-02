@@ -585,25 +585,6 @@ drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update
   to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
--- Private columns (email, phone, lat, lng, location) are not readable through
--- the API by anyone; the owner reads theirs via get_my_private_profile().
--- A column added to profiles later must be added here to be readable.
-revoke select on public.profiles from anon, authenticated;
-grant select (
-  id, name, username, age, avatar, cover, photos, city, hand, bio,
-  availability, is_community, community_type, verified,
-  friends_visibility, communities_visibility, show_in_browse,
-  created_at, updated_at
-) on public.profiles to authenticated;
-
-create or replace function public.get_my_private_profile()
-returns table (email text, phone text, lat double precision, lng double precision)
-language sql stable security definer set search_path = public as $$
-  select p.email, p.phone, p.lat, p.lng from public.profiles p where p.id = auth.uid();
-$$;
-revoke all on function public.get_my_private_profile() from public, anon;
-grant execute on function public.get_my_private_profile() to authenticated;
-
 -- ---- player_sports ----
 drop policy if exists ps_select on public.player_sports;
 create policy ps_select on public.player_sports for select to authenticated using (true);
